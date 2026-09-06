@@ -1,0 +1,83 @@
+[
+  {
+    "case_id": "compressor_flow_comparison",
+    "question": "How do centrifugal-flow and axial-flow compressors move air differently?",
+    "expected_source_id": "faa-h-8083-32b-chapter-1",
+    "expected_pdf_pages": [
+      38
+    ],
+    "relevance_note": "Page 1-38 directly contrasts outward centrifugal acceleration with axial compression in the original direction of airflow."
+  },
+  {
+    "case_id": "brayton_cycle_events",
+    "question": "What four continuous events make up the Brayton cycle in a gas turbine engine?",
+    "expected_source_id": "faa-h-8083-32b-chapter-1",
+    "expected_pdf_pages": [
+      58
+    ],
+    "relevance_note": "Page 1-58 names intake, compression, expansion, and exhaust and explains how they form the continuous gas-turbine cycle."
+  },
+  {
+    "case_id": "wet_vs_dry_sump_storage",
+    "question": "Where is lubricating oil stored in wet-sump and dry-sump turbine engine systems?",
+    "expected_source_id": "faa-h-8083-32b-chapter-6",
+    "expected_pdf_pages": [
+      20
+    ],
+    "relevance_note": "Page 6-20 states that wet-sump engines store oil in the engine while dry-sump engines use an external tank."
+  },
+  {
+    "case_id": "magnetic_chip_detector_particles",
+    "question": "How does a magnetic chip detector help identify possible internal engine wear?",
+    "expected_source_id": "faa-h-8083-32b-chapter-6",
+    "expected_pdf_pages": [
+      28
+    ],
+    "relevance_note": "Page 6-28 explains that chip detectors catch ferrous particles in scavenge oil and that discovered metal requires investigation of its source."
+  },
+  {
+    "case_id": "turbine_fod_prevention",
+    "question": "What maintenance practices help prevent foreign object damage to turbine engine compressor blades?",
+    "expected_source_id": "faa-h-8083-32b-chapter-10",
+    "expected_pdf_pages": [
+      45
+    ],
+    "relevance_note": "Page 10-45 identifies loose objects as a source of blade damage and recommends pocket discipline, tool checks, and inlet inspection before start."
+  },
+  {
+    "case_id": "hot_vs_hung_start",
+    "question": "How do hot and hung turbine engine starts differ, and what should be monitored during start?",
+    "expected_source_id": "faa-h-8083-32b-chapter-10",
+    "expected_pdf_pages": [
+      57
+    ],
+    "relevance_note": "Page 10-57 defines hot and hung starts and identifies tachometer, oil-pressure, and exhaust-gas-temperature monitoring during the start sequence."
+  },
+  {
+    "case_id": "compressor_air_path_paraphrase",
+    "question": "Which gas-turbine compressor design throws incoming air outward, and which design keeps the airflow moving straight through the engine?",
+    "expected_source_id": "faa-h-8083-32b-chapter-1",
+    "expected_pdf_pages": [
+      38
+    ],
+    "relevance_note": "Page 1-38 explains that centrifugal-flow compressors accelerate air outward while axial-flow compressors preserve its original flow direction."
+  },
+  {
+    "case_id": "oil_debris_detection_paraphrase",
+    "question": "What lubrication-system component captures iron-based debris carried in return oil, and what should technicians do when metal is found on it?",
+    "expected_source_id": "faa-h-8083-32b-chapter-6",
+    "expected_pdf_pages": [
+      28
+    ],
+    "relevance_note": "Page 6-28 explains that magnetic chip detectors catch ferrous particles and that discovered metal requires investigation of its source."
+  },
+  {
+    "case_id": "abnormal_start_symptoms_paraphrase",
+    "question": "During turbine-engine starting, what problems are indicated by excessive exhaust temperature and by ignition without acceleration to idle speed?",
+    "expected_source_id": "faa-h-8083-32b-chapter-10",
+    "expected_pdf_pages": [
+      57
+    ],
+    "relevance_note": "Page 10-57 identifies excessive starting temperature as a hot start and ignition without acceleration to idle rpm as a hung start."
+  }
+]

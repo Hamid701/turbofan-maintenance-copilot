@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    env:
+      POSTGRES_PASSWORD: ci-validation-only
+      TURBOFAN_DATABASE_URL: postgresql+psycopg://turbofan:ci-validation-only@localhost:5432/turbofan
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.1"
+          enable-cache: true
+
+      - name: Synchronize locked environment
+        run: uv sync --locked --group dev
+
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
+      - name: Render migration SQL
+        run: uv run --no-sync alembic upgrade head --sql
+
+      - name: Lint
+        run: uv run --no-sync ruff check src tests migrations
+
+      - name: Check formatting
+        run: uv run --no-sync ruff format --check src tests migrations
+
+      - name: Type-check
+        run: uv run --no-sync mypy src tests migrations
+
+      - name: Test
+        run: uv run --no-sync pytest
+
+      - name: Build package
+        run: uv run --no-sync python -m build

@@ -1,0 +1,18 @@
+{
+  "source_id": "nasa-cmapss-fd001",
+  "kind": "dataset",
+  "title": "Turbofan Engine Degradation Simulation Data Set - FD001",
+  "publisher": "NASA Ames Prognostics Center of Excellence",
+  "source_url": "https://www.nasa.gov/intelligent-systems-division/discovery-and-systems-health/pcoe/pcoe-data-set-repository/",
+  "download_url": "https://phm-datasets.s3.amazonaws.com/NASA/6.+Turbofan+Engine+Degradation+Simulation+Data+Set.zip",
+  "version": "2008 release, FD001 subset",
+  "license_note": "NASA Open Data lists no specific license. Retain the NASA citation and verify redistribution terms before publishing the raw files.",
+  "expected_files": [
+    "train_FD001.txt",
+    "test_FD001.txt",
+    "RUL_FD001.txt",
+    "readme.txt"
+  ],
+  "retrieved_on": "2026-08-01",
+  "archive_sha256": "74bef434a34db25c7bf72e668ea4cd52afe5f2cf8e44367c55a82bfd91a5a34f"
+}
