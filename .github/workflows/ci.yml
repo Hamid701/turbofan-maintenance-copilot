@@ -41,16 +41,18 @@ jobs:
         run: uv run --no-sync alembic upgrade head --sql
 
       - name: Lint
-        run: uv run --no-sync ruff check src tests migrations
+        run: uv run --no-sync ruff check src tests migrations scripts
 
       - name: Check formatting
-        run: uv run --no-sync ruff format --check src tests migrations
+        run: uv run --no-sync ruff format --check src tests migrations scripts
 
       - name: Type-check
-        run: uv run --no-sync mypy src tests migrations
+        run: uv run --no-sync mypy src tests migrations scripts
 
+      # No PostgreSQL service and no OpenAI key here, so the integration tests
+      # skip themselves. Unit tests must never need either.
       - name: Test
-        run: uv run --no-sync pytest
+        run: uv run --no-sync pytest --cov --cov-report=term-missing --cov-fail-under=80
 
       - name: Build package
         run: uv run --no-sync python -m build
