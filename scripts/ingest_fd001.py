@@ -1,14 +1,16 @@
-"""Load the FD001 train and test trajectories into PostgreSQL."""
+"""Load the FD001 train/test trajectories and the test-engine RUL targets into PostgreSQL."""
 
 import json
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from turbofan_copilot.db.fd001_store import ingest_fd001_readings
+from turbofan_copilot.db.fd001_store import ingest_fd001_readings, ingest_fd001_rul
 from turbofan_copilot.db.session import get_engine
 from turbofan_copilot.ingestion.fd001 import (
+    load_rul_file,
     load_trajectory_file,
+    validate_rul_structure,
     validate_trajectory_structure,
 )
 from turbofan_copilot.ingestion.raw_files import validate_expected_files
@@ -26,12 +28,15 @@ def main() -> None:
 
     train_frame = load_trajectory_file(RAW_DIRECTORY / "train_FD001.txt")
     test_frame = load_trajectory_file(RAW_DIRECTORY / "test_FD001.txt")
+    rul = load_rul_file(RAW_DIRECTORY / "RUL_FD001.txt")
     validate_trajectory_structure(train_frame)
     validate_trajectory_structure(test_frame)
+    validate_rul_structure(test_frame, rul)
 
     with Session(get_engine()) as session:
         train_rows = ingest_fd001_readings(session, train_frame, split="train")
         test_rows = ingest_fd001_readings(session, test_frame, split="test")
+        rul_rows = ingest_fd001_rul(session, rul)
         session.commit()
 
     report = {
@@ -39,6 +44,7 @@ def main() -> None:
         "train_engines": int(train_frame["unit_id"].nunique()),
         "test_rows": test_rows,
         "test_engines": int(test_frame["unit_id"].nunique()),
+        "rul_rows": rul_rows,
     }
     print(json.dumps(report, indent=2))
 

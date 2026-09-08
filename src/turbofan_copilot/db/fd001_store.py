@@ -1,5 +1,6 @@
 """Read and idempotently write FD001 rows in the ``sensor_readings`` table."""
 
+from collections.abc import Sequence
 from typing import Literal, cast
 
 import pandas as pd
@@ -7,7 +8,11 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from turbofan_copilot.db.models import SENSOR_READING_SPLITS, SensorReading
+from turbofan_copilot.db.models import (
+    SENSOR_READING_SPLITS,
+    EngineRul,
+    SensorReading,
+)
 from turbofan_copilot.ingestion.fd001 import (
     SENSOR_COLUMNS,
     SETTING_COLUMNS,
@@ -66,6 +71,36 @@ def ingest_fd001_readings(session: Session, frame: pd.DataFrame, *, split: Split
     return count or 0
 
 
+def ingest_fd001_rul(session: Session, rul: pd.Series) -> int:
+    """Upsert the FD001 test-engine RUL targets and return the row count.
+
+    ``rul`` is the one-column series from ``load_rul_file``; row ``i`` is test
+    engine ``i + 1``. The primary key is ``unit_id``, so re-running is a no-op.
+    """
+    if rul.empty:
+        raise ValueError("rul series must not be empty")
+    if bool((rul < 0).any()):
+        raise ValueError("rul targets must not be negative")
+
+    rows = [{"unit_id": index + 1, "rul": int(value)} for index, value in enumerate(rul)]
+    statement = insert(EngineRul).values(rows)
+    session.execute(
+        statement.on_conflict_do_update(
+            index_elements=["unit_id"],
+            set_={"rul": statement.excluded["rul"]},
+        )
+    )
+    session.flush()
+    return session.scalar(select(func.count()).select_from(EngineRul)) or 0
+
+
+def _readings_frame(rows: Sequence[SensorReading]) -> pd.DataFrame:
+    """Turn SensorReading ORM rows into a DataFrame with the reading columns."""
+    return pd.DataFrame(
+        [{column: getattr(row, column) for column in _READING_COLUMNS} for row in rows]
+    )
+
+
 def load_engine_readings(session: Session, split: str, unit_id: int) -> pd.DataFrame:
     """Return one engine's readings ordered by cycle, as a DataFrame."""
     rows = (
@@ -79,6 +114,20 @@ def load_engine_readings(session: Session, split: str, unit_id: int) -> pd.DataF
     )
     if not rows:
         raise LookupError(f"no readings for engine {unit_id} in split {split!r}")
-    return pd.DataFrame(
-        [{column: getattr(row, column) for column in _READING_COLUMNS} for row in rows]
+    return _readings_frame(rows)
+
+
+def load_split_readings(session: Session, split: str) -> pd.DataFrame:
+    """Return every reading for one split, ordered by unit then cycle, as a DataFrame."""
+    rows = (
+        session.execute(
+            select(SensorReading)
+            .where(SensorReading.split == split)
+            .order_by(SensorReading.unit_id, SensorReading.cycle)
+        )
+        .scalars()
+        .all()
     )
+    if not rows:
+        raise LookupError(f"no readings for split {split!r}")
+    return _readings_frame(rows)
