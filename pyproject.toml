@@ -17,6 +17,7 @@ dependencies = [
     "psycopg[binary]>=3,<4",
     "pydantic-settings>=2,<3",
     "pypdf>=6.10,<7",
+    "scikit-learn>=1.7,<2",
     "sqlalchemy>=2,<3",
     "torch>=2.14,<3",
     "transformers>=4.41,<5",
@@ -41,7 +42,10 @@ dev = [
 # file"), which breaks every import of transformers. Holding it to an
 # established build keeps the environment installable on Windows. Remove this
 # once the newer releases have gained reputation.
-constraint-dependencies = ["regex<2026"]
+# scipy arrives with scikit-learn and hits the same wall: the 1.18.x extension
+# DLLs are too new to carry reputation, so `import scipy.stats` dies on
+# `levyst` and takes scikit-learn with it.
+constraint-dependencies = ["regex<2026", "scipy<1.18"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -83,6 +87,12 @@ extend-immutable-calls = ["fastapi.Depends"]
 python_version = "3.13"
 strict = true
 mypy_path = "src"
+
+[[tool.mypy.overrides]]
+# scikit-learn ships no py.typed marker, so mypy cannot see its types. Scoped to
+# scikit-learn alone; every other module stays strictly checked.
+module = ["sklearn.*"]
+ignore_missing_imports = true
 
 [tool.coverage.run]
 branch = true
