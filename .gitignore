@@ -31,6 +31,9 @@ data/intermediate/
 data/processed/
 data/pdfs/
 
+# Per-run evaluation reports (a committed baseline comes later)
+data/evaluation/reports/
+
 # Local personal material
 resume.pdf
 

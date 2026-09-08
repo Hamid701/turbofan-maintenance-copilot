@@ -1,0 +1,41 @@
+{
+  "run": {
+    "created_at": "2026-09-07T07:54:09.811164Z",
+    "git": {
+      "sha": "243a73e6ac6ad0789a60e36f1b355a8b6daec7b4",
+      "dirty": true
+    },
+    "config": {
+      "retriever": "hybrid_rrf",
+      "embedding_model": "BAAI/bge-small-en-v1.5",
+      "embedding_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+      "rrf_k": "60",
+      "corpus_chunks": "1050",
+      "answer_model": "gpt-4o-mini"
+    }
+  },
+  "retrieval": {
+    "cases": 9,
+    "hit_at_1": 0.7777777777777778,
+    "hit_at_3": 0.7777777777777778,
+    "hit_at_5": 0.7777777777777778,
+    "mean_reciprocal_rank": 0.7777777777777778
+  },
+  "abstention": {
+    "cases": 10,
+    "accuracy": 1.0,
+    "answered_when_should_abstain": [],
+    "abstained_when_should_answer": [],
+    "errors": []
+  },
+  "cost": {
+    "calls": 10,
+    "prompt_tokens": 10080,
+    "completion_tokens": 483,
+    "usd_estimate": 0.001802
+  },
+  "timing": {
+    "retrieval_seconds": 0.506,
+    "abstention_seconds": 9.448
+  }
+}
