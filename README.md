@@ -196,47 +196,14 @@ docker compose down
 
 `docker compose down --volumes` deletes the database volume; that cannot be undone.
 
-## Project documents
+## Environment note
 
-- [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) — scope, the full dated decision log, evaluation
-  plans, safety boundaries, and the milestone roadmap.
-- [HANDOFF.md](HANDOFF.md) — compact current state and environment notes.
+Some packages ship compiled extensions that Windows Smart App Control will refuse to load until
+a release has built up reputation. `pyproject.toml` therefore pins two of them
+(`[tool.uv] constraint-dependencies = ["regex<2026", "scipy<1.18"]`); without those, `transformers`
+and `scikit-learn` can fail to import on Windows. Both constraints can be dropped once the newer
+releases are widely established.
 
-## Windows, OneDrive, and Smart App Control
-
-This project used to live on a Desktop that Windows 11 **Known Folder Move** had redirected into
-OneDrive — so a git repository and a virtual environment full of unsigned native DLLs sat inside
-a cloud-sync engine, without anyone choosing that. It caused three problems, none of which names
-its real cause:
-
-- Packages with native extensions (`torch`, `tokenizers`, `regex`) failed to import at random
-  with *"An Application Control policy has blocked this file"*. OneDrive dehydrates files and
-  re-downloads them on access; a re-materialised `.pyd` looks brand new to Windows Smart App
-  Control, which re-evaluates it and can refuse it.
-- uv could not hardlink from its cache: *"The cloud operation cannot be performed on a file with
-  incompatible hardlinks."*
-- Editable installs of the project itself failed.
-
-The fix is to keep code out of the synchronised tree. The repository now lives at
-`C:\dev\turbofan-maintenance-copilot` and the environment at `%USERPROFILE%\.venvs\`, reached
-through a **directory junction** so every tool still finds it at the usual `.venv` path:
-
-```powershell
-# one-time, from the project root
-Remove-Item .venv -Recurse -Force
-$target = "$HOME\.venvs\turbofan-maintenance-copilot"
-$env:UV_PROJECT_ENVIRONMENT = $target
-uv sync --locked --group dev
-New-Item -ItemType Junction -Path .venv -Target $target
-```
-
-After that, `uv sync`, `uv run`, and `pytest` all work with no environment variables set. If you
-clone this repository into a synchronised folder, expect the problems above to return.
-
-**Smart App Control blocks brand-new unsigned DLLs.** It is `ENFORCED` on this machine
-(`HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy\VerifiedAndReputablePolicyState = 1`) and
-refuses to load native extensions that have no cloud reputation yet — which a package released
-days ago will not have. `regex 2026.9.3` was blocked outright, breaking every `transformers`
-import; `regex 2025.11.3` loads fine. `[tool.uv] constraint-dependencies = ["regex<2026"]` in
-`pyproject.toml` holds it to an established build, and can be removed once the newer releases
-have gained reputation.
+Keep the repository and its virtual environment outside a cloud-synchronised folder. A sync engine
+that dehydrates and re-materialises files makes native extension DLLs look new on every access,
+which triggers the problem above and also breaks uv's hardlinking from its cache.

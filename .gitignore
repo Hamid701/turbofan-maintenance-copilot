@@ -43,3 +43,9 @@ resume.pdf
 .DS_Store
 Thumbs.db
 
+
+# Internal working documents: assistant handoff notes and the private decision
+# log. They carry local machine paths and environment specifics, so they stay on
+# disk and out of the repository.
+HANDOFF.md
+PROJECT_CONTEXT.md
