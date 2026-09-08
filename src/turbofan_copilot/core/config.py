@@ -3,7 +3,7 @@
 from enum import StrEnum
 from functools import lru_cache
 
-from pydantic import PostgresDsn, SecretStr, TypeAdapter, field_validator
+from pydantic import Field, PostgresDsn, SecretStr, TypeAdapter, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _POSTGRES_DSN_ADAPTER = TypeAdapter(PostgresDsn)
@@ -42,6 +42,20 @@ class Settings(BaseSettings):
     environment: RuntimeEnvironment = RuntimeEnvironment.DEVELOPMENT
     log_level: LogLevel = LogLevel.INFO
     database_url: SecretStr
+
+    # Optional so retrieval and engine-health work without an LLM. The pipeline
+    # raises a clear error if it needs the key and it is absent.
+    openai_api_key: SecretStr | None = None
+    openai_model: str = "gpt-4o-mini"
+
+    # The SDK default is 600 s, long enough to pin a worker, a database session,
+    # and the caller's connection for ten minutes on one hung upstream call.
+    openai_timeout_seconds: float = Field(default=30.0, gt=0)
+    openai_max_retries: int = Field(default=2, ge=0)
+
+    # Shared secret for the ingestion endpoints. Absent means those endpoints are
+    # unavailable (503), never open.
+    ingest_api_key: SecretStr | None = None
 
     @field_validator("database_url")
     @classmethod

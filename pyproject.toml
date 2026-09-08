@@ -10,6 +10,8 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "alembic>=1,<2",
     "fastapi>=0,<1",
+    "langchain-core>=0.3,<0.4",
+    "openai>=1,<2",
     "pandas>=2.2,<4",
     "pgvector>=0.3,<1",
     "psycopg[binary]>=3,<4",
@@ -31,6 +33,15 @@ dev = [
     "pytest-cov>=6,<8",
     "ruff>=0.12,<1",
 ]
+
+[tool.uv]
+# regex is a transitive dependency of transformers. Its 2026.9.x builds are days
+# old and carry no code-signing reputation, so Windows Smart App Control refuses
+# to load the extension DLL ("An Application Control policy has blocked this
+# file"), which breaks every import of transformers. Holding it to an
+# established build keeps the environment installable on Windows. Remove this
+# once the newer releases have gained reputation.
+constraint-dependencies = ["regex<2026"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -63,6 +74,10 @@ select = [
     "SIM",
     "UP",
 ]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom puts Depends(...) in argument defaults.
+extend-immutable-calls = ["fastapi.Depends"]
 
 [tool.mypy]
 python_version = "3.13"

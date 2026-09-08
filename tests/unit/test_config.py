@@ -57,3 +57,36 @@ def test_settings_reject_non_postgresql_database_url(
         Settings(
             database_url=SecretStr("sqlite:///local.db"),
         )
+
+
+def test_openai_settings_are_optional_with_a_default_model(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    without_key = Settings(
+        database_url=SecretStr("postgresql+psycopg://u:p@localhost:5432/turbofan"),
+    )
+    assert without_key.openai_api_key is None
+    assert without_key.openai_model == "gpt-4o-mini"
+
+
+def test_openai_key_and_model_load_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "TURBOFAN_DATABASE_URL",
+        "postgresql+psycopg://u:p@localhost:5432/turbofan",
+    )
+    monkeypatch.setenv("TURBOFAN_OPENAI_API_KEY", "sk-test-value")
+    monkeypatch.setenv("TURBOFAN_OPENAI_MODEL", "gpt-4o")
+
+    get_settings.cache_clear()
+    settings = get_settings()
+    get_settings.cache_clear()
+
+    assert settings.openai_api_key is not None
+    assert settings.openai_api_key.get_secret_value() == "sk-test-value"
+    assert settings.openai_model == "gpt-4o"
