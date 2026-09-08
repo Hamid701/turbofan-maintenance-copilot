@@ -1,18 +1,24 @@
-"""SQLAlchemy models: the persisted retrieval corpus and the FD001 sensor readings."""
+"""SQLAlchemy models: the persisted corpus, FD001 readings, and served-query logs."""
+
+from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    DateTime,
     Double,
     ForeignKey,
     Identity,
     Index,
+    Integer,
     SmallInteger,
     String,
     Text,
     UniqueConstraint,
+    func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from turbofan_copilot.db.base import Base
@@ -128,3 +134,62 @@ class SensorReading(Base):
     sensor_19: Mapped[float] = mapped_column(Double, nullable=False)
     sensor_20: Mapped[float] = mapped_column(Double, nullable=False)
     sensor_21: Mapped[float] = mapped_column(Double, nullable=False)
+
+
+class EngineRul(Base):
+    """The ground-truth remaining-useful-life target for one FD001 test engine.
+
+    From ``RUL_FD001.txt``: the cycles each truncated test engine still has left
+    after its last observed cycle. Train engines have no target (they run to failure).
+    """
+
+    __tablename__ = "engine_rul"
+    __table_args__ = (CheckConstraint("rul >= 0", name="ck_engine_rul_nonnegative"),)
+
+    unit_id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    rul: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+
+
+FEEDBACK_RATINGS = ("up", "down")
+
+
+class QueryRun(Base):
+    """One answered ``POST /v1/query`` request, for tracing and later analysis."""
+
+    __tablename__ = "query_runs"
+    __table_args__ = (Index("ix_query_runs_request_id", "request_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    request_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    abstained: Mapped[bool] = mapped_column(nullable=False)
+    citation_count: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    citations: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False)
+    engine_unit_id: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    answer_model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class Feedback(Base):
+    """A reader's up/down verdict on an earlier answer, keyed by its request id."""
+
+    __tablename__ = "feedback"
+    __table_args__ = (
+        CheckConstraint("rating IN ('up', 'down')", name="ck_feedback_rating"),
+        Index("ix_feedback_query_request_id", "query_request_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    query_request_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    rating: Mapped[str] = mapped_column(String(4), nullable=False)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )

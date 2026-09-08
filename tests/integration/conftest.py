@@ -4,10 +4,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine, func, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from turbofan_copilot.db.models import Feedback, QueryRun
 from turbofan_copilot.db.session import get_engine
 from turbofan_copilot.retrieval.bge_embedder import BgeEmbedder
 
@@ -44,3 +45,33 @@ def db_session(db_engine: Engine) -> Iterator[Session]:
         session.close()
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def committed_row_guard(db_engine: Engine) -> Iterator[None]:
+    """Fail any test that leaves committed rows in the request-log tables.
+
+    Endpoints that write through their own session escape ``db_session``'s
+    rollback, so a test using the real app must override ``get_db_session``.
+    This fixture turns that easy mistake into a failure instead of silent
+    pollution of the developer's database.
+    """
+
+    def _counts() -> dict[str, int]:
+        with Session(db_engine) as session:
+            return {
+                table: session.scalar(select(func.count()).select_from(model)) or 0
+                for table, model in (("query_runs", QueryRun), ("feedback", Feedback))
+            }
+
+    before = _counts()
+    yield
+    after = _counts()
+    leaked = {
+        table: after[table] - before[table] for table in before if after[table] > before[table]
+    }
+    if leaked:
+        raise AssertionError(
+            f"test committed rows outside its transaction: {leaked}. "
+            "Override get_db_session when building an app under test."
+        )

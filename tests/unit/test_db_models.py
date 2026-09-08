@@ -4,13 +4,23 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import CheckConstraint, UniqueConstraint
 
 from turbofan_copilot.db.base import Base
-from turbofan_copilot.db.models import Chunk, ChunkEmbedding, SensorReading
+from turbofan_copilot.db.models import (
+    Chunk,
+    ChunkEmbedding,
+    EngineRul,
+    Feedback,
+    QueryRun,
+    SensorReading,
+)
 from turbofan_copilot.ingestion.fd001 import TRAJECTORY_COLUMNS
 from turbofan_copilot.retrieval.bge_embedder import EMBEDDING_DIMENSION
 
 CHUNKS = Base.metadata.tables["chunks"]
 CHUNK_EMBEDDINGS = Base.metadata.tables["chunk_embeddings"]
 SENSOR_READINGS = Base.metadata.tables["sensor_readings"]
+ENGINE_RUL = Base.metadata.tables["engine_rul"]
+QUERY_RUNS = Base.metadata.tables["query_runs"]
+FEEDBACK = Base.metadata.tables["feedback"]
 
 
 def test_chunk_table_carries_the_document_chunk_fields() -> None:
@@ -55,6 +65,56 @@ def test_orm_classes_map_to_the_expected_tables() -> None:
     assert Chunk.__tablename__ == "chunks"
     assert ChunkEmbedding.__tablename__ == "chunk_embeddings"
     assert SensorReading.__tablename__ == "sensor_readings"
+    assert EngineRul.__tablename__ == "engine_rul"
+    assert QueryRun.__tablename__ == "query_runs"
+    assert Feedback.__tablename__ == "feedback"
+
+
+def test_query_runs_carries_the_trace_fields_and_is_indexed_by_request_id() -> None:
+    assert {column.name for column in QUERY_RUNS.columns} == {
+        "id",
+        "request_id",
+        "question",
+        "abstained",
+        "citation_count",
+        "citations",
+        "engine_unit_id",
+        "answer_model",
+        "latency_ms",
+        "created_at",
+    }
+    assert QUERY_RUNS.columns["engine_unit_id"].nullable is True
+    assert QUERY_RUNS.columns["request_id"].nullable is False
+    assert any(index.name == "ix_query_runs_request_id" for index in QUERY_RUNS.indexes)
+
+
+def test_feedback_restricts_rating_and_links_softly_to_a_request_id() -> None:
+    assert {column.name for column in FEEDBACK.columns} == {
+        "id",
+        "query_request_id",
+        "rating",
+        "comment",
+        "created_at",
+    }
+    assert not FEEDBACK.foreign_keys  # a soft reference, not a hard FK
+    rating_checks = [
+        constraint
+        for constraint in FEEDBACK.constraints
+        if isinstance(constraint, CheckConstraint) and constraint.name == "ck_feedback_rating"
+    ]
+    assert len(rating_checks) == 1
+
+
+def test_engine_rul_is_keyed_by_unit_with_a_nonnegative_check() -> None:
+    assert {column.name for column in ENGINE_RUL.columns} == {"unit_id", "rul"}
+    assert ENGINE_RUL.columns["unit_id"].primary_key
+    assert ENGINE_RUL.columns["rul"].nullable is False
+    checks = [
+        str(constraint.sqltext)
+        for constraint in ENGINE_RUL.constraints
+        if isinstance(constraint, CheckConstraint)
+    ]
+    assert any("rul" in text for text in checks)
 
 
 def test_sensor_readings_carries_the_fd001_trajectory_columns() -> None:
