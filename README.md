@@ -204,26 +204,34 @@ docker compose down
 
 ## Windows, OneDrive, and Smart App Control
 
-This repository lives inside a OneDrive-synchronised folder, which caused two problems worth
-recording because the fixes are not obvious.
+This project used to live on a Desktop that Windows 11 **Known Folder Move** had redirected into
+OneDrive — so a git repository and a virtual environment full of unsigned native DLLs sat inside
+a cloud-sync engine, without anyone choosing that. It caused three problems, none of which names
+its real cause:
 
-**OneDrive re-materialises files, which re-triggers security evaluation.** Packages with native
-extensions (`torch`, `tokenizers`, `regex`) would intermittently fail to import with *"An
-Application Control policy has blocked this file"*, and uv could not hardlink from its cache
-("The cloud operation cannot be performed on a file with incompatible hardlinks"). The fix is to
-keep the environment out of the synchronised tree entirely. `.venv` here is a **directory
-junction**, so every tool still finds it at the usual path while OneDrive skips the reparse
-point:
+- Packages with native extensions (`torch`, `tokenizers`, `regex`) failed to import at random
+  with *"An Application Control policy has blocked this file"*. OneDrive dehydrates files and
+  re-downloads them on access; a re-materialised `.pyd` looks brand new to Windows Smart App
+  Control, which re-evaluates it and can refuse it.
+- uv could not hardlink from its cache: *"The cloud operation cannot be performed on a file with
+  incompatible hardlinks."*
+- Editable installs of the project itself failed.
+
+The fix is to keep code out of the synchronised tree. The repository now lives at
+`C:\dev\turbofan-maintenance-copilot` and the environment at `%USERPROFILE%\.venvs\`, reached
+through a **directory junction** so every tool still finds it at the usual `.venv` path:
 
 ```powershell
 # one-time, from the project root
 Remove-Item .venv -Recurse -Force
 $target = "$HOME\.venvs\turbofan-maintenance-copilot"
-uv sync --locked --group dev            # with $env:UV_PROJECT_ENVIRONMENT = $target
+$env:UV_PROJECT_ENVIRONMENT = $target
+uv sync --locked --group dev
 New-Item -ItemType Junction -Path .venv -Target $target
 ```
 
-After that, `uv sync`, `uv run`, and `pytest` all work with no environment variables set.
+After that, `uv sync`, `uv run`, and `pytest` all work with no environment variables set. If you
+clone this repository into a synchronised folder, expect the problems above to return.
 
 **Smart App Control blocks brand-new unsigned DLLs.** It is `ENFORCED` on this machine
 (`HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy\VerifiedAndReputablePolicyState = 1`) and
