@@ -23,8 +23,6 @@ from turbofan_copilot.evaluation.rul_evaluation import (
     RulCase,
     RulScore,
     evaluate_predictor,
-    label_train_readings,
-    piecewise_rul,
     split_engine_ids,
     validation_cases,
 )
@@ -34,6 +32,7 @@ from turbofan_copilot.health.degradation import (
     estimate_engine_rul,
     fit_degradation_model,
 )
+from turbofan_copilot.health.rul_features import label_train_readings, piecewise_rul
 from turbofan_copilot.health.rul_regressor import fit_boosted_rul_regressor, fit_rul_regressor
 
 DEFAULT_ALPHAS = (1.0, 10.0, 100.0, 1000.0)

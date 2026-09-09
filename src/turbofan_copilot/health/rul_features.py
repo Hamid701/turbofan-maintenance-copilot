@@ -15,12 +15,39 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-from turbofan_copilot.health.degradation import STD_FLOOR
+from turbofan_copilot.health.degradation import RUL_CAP, STD_FLOOR
 from turbofan_copilot.health.engine_health import DEFAULT_WINDOW
 from turbofan_copilot.ingestion.fd001 import SENSOR_COLUMNS
 
 FEATURE_WINDOW = DEFAULT_WINDOW
 CYCLES_RUN = "cycles_run"
+
+
+def piecewise_rul(remaining_cycles: int, *, cap: int = RUL_CAP) -> int:
+    """Return the capped remaining life used as the supervised target.
+
+    An engine early in its life shows no measurable degradation, so asking a model
+    to predict its true distance to failure teaches it noise. The C-MAPSS
+    convention is to hold the target flat at the cap until wear becomes visible.
+    """
+    if remaining_cycles < 0:
+        raise ValueError("remaining_cycles must not be negative")
+    return min(remaining_cycles, cap)
+
+
+def label_train_readings(train_readings: pd.DataFrame, *, cap: int = RUL_CAP) -> pd.DataFrame:
+    """Return the run-to-failure frame with a piecewise-linear ``rul`` column.
+
+    Every train engine ends at its failure, so remaining life at any row is that
+    engine's last cycle minus this cycle, held at ``cap``.
+    """
+    if "rul" in train_readings.columns:
+        raise ValueError("train_readings already carries a rul column")
+    labelled = train_readings.copy()
+    final_cycle = labelled.groupby("unit_id")["cycle"].transform("max")
+    remaining = final_cycle - labelled["cycle"]
+    labelled["rul"] = remaining.clip(upper=cap).astype("int64")
+    return labelled
 
 
 def informative_sensors(train_readings: pd.DataFrame) -> tuple[str, ...]:

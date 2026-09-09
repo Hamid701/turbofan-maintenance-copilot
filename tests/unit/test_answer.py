@@ -2,14 +2,13 @@
 
 import pytest
 
-from turbofan_copilot.health.degradation import RulEstimate
 from turbofan_copilot.health.engine_health import EngineHealthSummary, SensorTrend
 from turbofan_copilot.ingestion.chunking import DocumentChunk
 from turbofan_copilot.llm.answer import Citation, GroundedAnswer
 from turbofan_copilot.llm.pipeline import answer_question
 from turbofan_copilot.llm.provider import ChatMessage, ResponseModel
 from turbofan_copilot.llm.router import EngineReference
-from turbofan_copilot.llm.tools import EngineHealthReport
+from turbofan_copilot.llm.tools import EngineHealthReport, RulPrediction
 from turbofan_copilot.retrieval.semantic_retrieval import ScoredChunk
 
 
@@ -78,15 +77,11 @@ def fake_engine_report(unit_id: int = 47) -> EngineHealthReport:
         ),
         biggest_movers=("sensor_4",),
     )
-    rul = RulEstimate(
-        split="test",
-        unit_id=unit_id,
-        latest_cycle=120,
-        cycles_analysed=30,
-        current_index=1.2,
-        index_slope_per_cycle=0.02,
-        raw_estimate=38.0,
+    rul = RulPrediction(
         estimated_rul=38,
+        model="boosted-trees",
+        typical_error_cycles=8.4,
+        cycles_observed=120,
     )
     return EngineHealthReport(trend=trend, rul=rul)
 
@@ -167,6 +162,11 @@ def test_engine_data_is_fetched_and_shown_when_the_question_names_an_engine() ->
     prompt = provider.calls[0][1].content
     assert "test engine #47" in prompt
     assert "Estimated remaining useful life: 38 cycles" in prompt
+    # The prompt must mark the number as a prediction and carry its error, so the
+    # model cannot relay it as a measurement.
+    assert "PREDICTION" in prompt
+    assert "boosted-trees" in prompt
+    assert "about 8 cycles" in prompt
     assert "sensor_4 (+0.9%)" in prompt
     assert result.engine_health == fake_engine_report(47)
     assert [c.pdf_page_number for c in result.citations] == [28]

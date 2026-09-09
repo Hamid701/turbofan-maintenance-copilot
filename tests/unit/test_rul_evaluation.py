@@ -7,14 +7,13 @@ from turbofan_copilot.evaluation.rul_evaluation import (
     MIN_HISTORY_CYCLES,
     MIN_TRUE_RUL,
     evaluate_predictor,
-    label_train_readings,
     nasa_score,
-    piecewise_rul,
     score_rul,
     split_engine_ids,
     validation_cases,
 )
 from turbofan_copilot.health.degradation import RUL_CAP
+from turbofan_copilot.health.rul_features import label_train_readings, piecewise_rul
 
 
 def run_to_failure(*, engines: int, cycles: int) -> pd.DataFrame:

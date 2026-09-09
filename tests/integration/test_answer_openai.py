@@ -18,6 +18,7 @@ from turbofan_copilot.llm.tools import (
     EngineHealthReport,
     build_engine_health_report,
     load_degradation_model,
+    load_rul_regressor,
 )
 from turbofan_copilot.retrieval.bge_embedder import BgeEmbedder
 from turbofan_copilot.retrieval.hybrid_retrieval import HybridRetriever
@@ -92,10 +93,14 @@ def test_pipeline_pulls_engine_data_when_the_question_names_an_engine(
 
         hybrid = _hybrid_retriever(session, embedder)
         degradation_model = load_degradation_model(session)
+        rul_regressor = load_rul_regressor(session)
 
         def lookup(reference: EngineReference) -> EngineHealthReport:
             return build_engine_health_report(
-                session, reference, degradation_model=degradation_model
+                session,
+                reference,
+                degradation_model=degradation_model,
+                rul_regressor=rul_regressor,
             )
 
         answer = answer_question(
@@ -107,7 +112,7 @@ def test_pipeline_pulls_engine_data_when_the_question_names_an_engine(
         )
 
     assert answer.engine_health is not None
-    assert answer.engine_health.rul.unit_id == 5
+    assert answer.engine_health.rul.model == "boosted-trees"
     assert answer.engine_health.trend.unit_id == 5
     assert answer.answer.strip()
 

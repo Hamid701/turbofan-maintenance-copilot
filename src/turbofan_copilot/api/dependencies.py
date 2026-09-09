@@ -29,6 +29,7 @@ from turbofan_copilot.llm.tools import (
     EngineHealthReport,
     build_engine_health_report,
     load_degradation_model,
+    load_rul_regressor,
 )
 from turbofan_copilot.retrieval.bge_embedder import BgeEmbedder
 from turbofan_copilot.retrieval.hybrid_retrieval import HybridRetriever
@@ -73,6 +74,9 @@ class PipelineQueryService:
         with self._session_factory() as session:
             corpus = load_persisted_corpus(session)
             self._degradation_model = load_degradation_model(session)
+            # Fitted once at construction, like the retriever: a few seconds over
+            # the stored train set, then every request reuses it.
+            self._rul_regressor = load_rul_regressor(session)
 
         lexical = LexicalRetriever(corpus.chunks)
         semantic = SemanticRetriever(corpus.chunks, corpus.vectors, embedder)
@@ -86,7 +90,10 @@ class PipelineQueryService:
     def _engine_report(self, reference: EngineReference) -> EngineHealthReport:
         with self._session_factory() as session:
             return build_engine_health_report(
-                session, reference, degradation_model=self._degradation_model
+                session,
+                reference,
+                degradation_model=self._degradation_model,
+                rul_regressor=self._rul_regressor,
             )
 
     def answer(self, question: str) -> GroundedAnswer:

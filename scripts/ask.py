@@ -18,6 +18,7 @@ from turbofan_copilot.llm.tools import (
     EngineHealthReport,
     build_engine_health_report,
     load_degradation_model,
+    load_rul_regressor,
 )
 from turbofan_copilot.retrieval.bge_embedder import BgeEmbedder
 from turbofan_copilot.retrieval.hybrid_retrieval import HybridRetriever
@@ -45,10 +46,14 @@ def main() -> None:
         hybrid = HybridRetriever(lexical, semantic, corpus_size=len(corpus.chunks))
 
         degradation_model = load_degradation_model(session)
+        rul_regressor = load_rul_regressor(session)
 
         def engine_report_lookup(reference: EngineReference) -> EngineHealthReport:
             return build_engine_health_report(
-                session, reference, degradation_model=degradation_model
+                session,
+                reference,
+                degradation_model=degradation_model,
+                rul_regressor=rul_regressor,
             )
 
         answer = answer_question(

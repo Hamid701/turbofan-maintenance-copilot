@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from turbofan_copilot.evaluation.rul_evaluation import label_train_readings
 from turbofan_copilot.health.degradation import RUL_CAP
 from turbofan_copilot.health.rul_features import (
     CYCLES_RUN,
     feature_names,
     features_from_window,
     informative_sensors,
+    label_train_readings,
     training_table,
     window_features,
 )

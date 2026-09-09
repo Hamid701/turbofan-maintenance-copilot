@@ -37,9 +37,14 @@ from turbofan_copilot.health.rul_features import (
 
 DEFAULT_ALPHA = 10.0
 DEFAULT_LEARNING_RATE = 0.05
-DEFAULT_MAX_LEAF_NODES = 31
+DEFAULT_MAX_LEAF_NODES = 15
 DEFAULT_MAX_ITER = 400
 RANDOM_STATE = 0
+
+# Mean absolute error of the chosen configuration over the 100 held-out FD001 test
+# engines (ADR-001, `scripts/evaluate_rul.py --test`). Reported alongside every
+# prediction so a reader can size the estimate instead of reading it as exact.
+BOOSTED_TEST_MAE = 8.4
 
 
 class RulRegressor:

@@ -87,8 +87,10 @@ def format_engine_report(reference: EngineReference, report: EngineHealthReport)
         f"NOT from the manual):\n"
         f"- {reference.split} engine #{reference.unit_id}, latest observed cycle "
         f"{trend.latest_cycle}, {trend.cycles_observed} cycles of history.\n"
-        f"- Estimated remaining useful life: {rul.estimated_rul} cycles "
-        f"(degradation-index extrapolation, capped at 125; raw {rul.raw_estimate:.0f}).\n"
+        f"- Estimated remaining useful life: {rul.estimated_rul} cycles. This is a "
+        f"model PREDICTION, not a measurement: produced by the {rul.model} model, "
+        f"whose typical error on held-out engines is about {rul.typical_error_cycles:.0f} "
+        f"cycles, capped at 125. State the uncertainty when you relay it.\n"
         f"- Sensors moving most over the last {trend.cycles_analysed} cycles: {movers}."
     )
 

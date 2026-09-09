@@ -15,6 +15,12 @@ from turbofan_copilot.ingestion.fd001 import SENSOR_COLUMNS
 STD_FLOOR = 1e-6
 RUL_CAP = 125
 
+# Mean absolute error over the 100 held-out FD001 test engines. Kept beside the
+# model that earned it so a prediction can state its own uncertainty. This
+# baseline is far weaker than the fitted regressor (ADR-001) and now serves only
+# engines whose history is too short for the learned model's feature window.
+BASELINE_TEST_MAE = 25.8
+
 
 class SensorNorm(BaseModel):
     """How to standardise and sign-align one informative sensor."""
