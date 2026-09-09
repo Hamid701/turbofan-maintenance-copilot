@@ -18,5 +18,25 @@ services:
       retries: 10
       start_period: 10s
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Inside the compose network the database is reachable by service name,
+      # not on localhost as it is from the host shell.
+      TURBOFAN_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-turbofan}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your .env file}@postgres:5432/${POSTGRES_DB:-turbofan}
+      TURBOFAN_ENVIRONMENT: ${TURBOFAN_ENVIRONMENT:-development}
+      TURBOFAN_LOG_LEVEL: ${TURBOFAN_LOG_LEVEL:-INFO}
+      # Optional. Without a key the service still starts and serves /health;
+      # POST /v1/query fails loudly on first use rather than at boot.
+      TURBOFAN_OPENAI_API_KEY: ${TURBOFAN_OPENAI_API_KEY:-}
+      TURBOFAN_INGEST_API_KEY: ${TURBOFAN_INGEST_API_KEY:-}
+    ports:
+      - "${TURBOFAN_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:

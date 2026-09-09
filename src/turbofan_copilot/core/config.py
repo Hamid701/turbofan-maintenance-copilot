@@ -2,11 +2,13 @@
 
 from enum import StrEnum
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, PostgresDsn, SecretStr, TypeAdapter, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _POSTGRES_DSN_ADAPTER = TypeAdapter(PostgresDsn)
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 class RuntimeEnvironment(StrEnum):
@@ -56,6 +58,12 @@ class Settings(BaseSettings):
     # Shared secret for the ingestion endpoints. Absent means those endpoints are
     # unavailable (503), never open.
     ingest_api_key: SecretStr | None = None
+
+    # Where the BGE weights live. The default is the repository's data directory,
+    # which is correct for a source checkout; a container installs the package
+    # into site-packages, where that relative guess is meaningless, so the image
+    # sets TURBOFAN_MODEL_CACHE_DIR explicitly.
+    model_cache_dir: Path = _REPOSITORY_ROOT / "data" / "processed" / "models"
 
     @field_validator("database_url")
     @classmethod

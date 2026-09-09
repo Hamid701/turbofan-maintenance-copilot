@@ -1,0 +1,40 @@
+# Everything the image does not need. Without this the build context carries the
+# 89 MB of raw PDFs and C-MAPSS files, the 129 MB model cache, and the whole git
+# history - none of which belongs in a production image.
+
+.git/
+.github/
+.venv/
+venv/
+
+# Caches and build output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Data: raw sources, derived corpora, and the model cache. The image downloads
+# the pinned BGE weights itself; the corpus and FD001 rows live in PostgreSQL.
+data/
+
+# Local configuration and secrets. The container is configured by environment.
+.env
+.env.*
+
+# Internal working documents and assistant configuration
+HANDOFF.md
+PROJECT_CONTEXT.md
+.claude/
+.agents/
+.codex/
+tmp/
+
+# Tests are not shipped; they run in CI against the source tree.
+tests/

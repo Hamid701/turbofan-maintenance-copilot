@@ -27,6 +27,26 @@ def test_settings_use_safe_application_defaults(
     assert str(settings.database_url) == "**********"
 
 
+def test_model_cache_defaults_to_the_repository_and_is_overridable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    dsn = SecretStr("postgresql+psycopg://user:password@localhost:5432/turbofan")
+
+    # A source checkout finds the weights under the repository's data directory.
+    assert Settings(database_url=dsn).model_cache_dir.parts[-3:] == (
+        "data",
+        "processed",
+        "models",
+    )
+
+    # A container installs the package into site-packages, where that relative
+    # guess is meaningless, so the image sets the path explicitly.
+    monkeypatch.setenv("TURBOFAN_MODEL_CACHE_DIR", "/opt/models")
+    assert Settings(database_url=dsn).model_cache_dir == Path("/opt/models")
+
+
 def test_settings_load_prefixed_environment_variables(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

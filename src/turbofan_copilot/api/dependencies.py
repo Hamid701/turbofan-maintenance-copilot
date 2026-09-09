@@ -10,7 +10,6 @@ process. Tests replace the whole service through ``app.dependency_overrides``.
 import logging
 import threading
 from collections.abc import AsyncIterator, Iterator
-from pathlib import Path
 from typing import Protocol, cast
 
 from fastapi import FastAPI, Request
@@ -34,8 +33,6 @@ from turbofan_copilot.llm.tools import (
 from turbofan_copilot.retrieval.bge_embedder import BgeEmbedder
 from turbofan_copilot.retrieval.hybrid_retrieval import HybridRetriever
 from turbofan_copilot.retrieval.semantic_retrieval import SemanticRetriever
-
-_MODEL_CACHE = Path(__file__).resolve().parents[3] / "data" / "processed" / "models"
 
 _logger = logging.getLogger(__name__)
 
@@ -70,7 +67,7 @@ class PipelineQueryService:
         self._provider = build_openai_provider(settings)
         self._session_factory = sessionmaker(get_engine(settings))
 
-        embedder = BgeEmbedder(_MODEL_CACHE)
+        embedder = BgeEmbedder(settings.model_cache_dir)
         with self._session_factory() as session:
             corpus = load_persisted_corpus(session)
             self._degradation_model = load_degradation_model(session)

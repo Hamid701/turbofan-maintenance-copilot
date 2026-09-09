@@ -47,6 +47,18 @@ dev = [
 # `levyst` and takes scikit-learn with it.
 constraint-dependencies = ["regex<2026", "scipy<1.18"]
 
+# PyPI's Linux torch wheel bundles the whole CUDA toolchain - gigabytes of GPU
+# libraries this service never calls, since inference is CPU-only. The container
+# therefore takes torch from PyTorch's CPU index. Scoped to Linux by marker so
+# the Windows development environment keeps resolving exactly as before.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

@@ -188,6 +188,45 @@ uv run --no-sync pytest
 Around 200 tests. Unit tests use fakes throughout — no model load, no database, no network.
 Integration tests skip themselves when PostgreSQL or the API key is absent.
 
+## Running the API in a container
+
+The whole stack comes up with one command. The API image is built from
+`Dockerfile`; PostgreSQL starts first and the API waits for its health check.
+
+```powershell
+docker compose up -d --build
+curl http://localhost:8000/health
+```
+
+The database still needs its schema and data the first time:
+
+```powershell
+docker compose exec api alembic upgrade head
+```
+
+Then ingest the corpus and FD001 from the host (`scripts/ingest_700_char_corpus.py`
+and `scripts/ingest_fd001.py`), which need the raw PDFs and data files that are
+deliberately not in the image.
+
+Notes on the image:
+
+- **Two stages.** The builder resolves the locked dependencies and downloads the
+  pinned embedding weights; the runtime keeps only the finished virtual
+  environment, those weights, and the migrations. No uv, no compilers, no source
+  tree, and no git history ship.
+- **Non-root.** The service runs as uid 1001 with no login shell.
+- **CPU-only PyTorch.** PyPI's Linux torch wheel drags in the entire CUDA
+  toolchain, which this service never calls. `pyproject.toml` points torch at
+  PyTorch's CPU index for Linux only, which removes 19 packages from the
+  resolution and leaves the Windows development environment untouched.
+- **The weights are baked in**, so a container starts without reaching Hugging
+  Face (`HF_HUB_OFFLINE=1`) and the first request does not pay a download.
+- **Migrations are not applied at startup.** Several replicas booting together
+  must not race to migrate one database, so `alembic upgrade head` is a separate,
+  deliberate step.
+- The image is about 2.4 GB, of which 769 MB is PyTorch. That is the price of
+  running the embedding model in-process.
+
 ## Stop local services
 
 ```powershell
