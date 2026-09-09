@@ -49,3 +49,9 @@ Thumbs.db
 # disk and out of the repository.
 HANDOFF.md
 PROJECT_CONTEXT.md
+
+# Coding-assistant configuration and scratch space. Kept locally, never pushed.
+.claude/
+.agents/
+.codex/
+tmp/
