@@ -188,6 +188,34 @@ uv run --no-sync pytest
 Around 200 tests. Unit tests use fakes throughout — no model load, no database, no network.
 Integration tests skip themselves when PostgreSQL or the API key is absent.
 
+## Liveness and readiness
+
+Two endpoints, answering two different questions.
+
+- `GET /health` — **liveness**. Is the process up? It touches nothing else, so it
+  keeps answering 200 during a database outage. A failure here means *restart this
+  container*. The image's `HEALTHCHECK` uses this one.
+- `GET /ready` — **readiness**. Can this instance serve queries? It checks the
+  database, that the corpus has been ingested, that the embedding weights are on
+  disk, and that a generation key is configured, and answers 503 if any of them
+  fails. A failure means *stop sending traffic here*, not *restart me*.
+
+```json
+{"status": "ready", "checks": [
+  {"name": "database",        "ok": true, "detail": "reachable"},
+  {"name": "corpus",          "ok": true, "detail": "1050 chunks"},
+  {"name": "embedding_model", "ok": true, "detail": "present"},
+  {"name": "llm_credentials", "ok": true, "detail": "configured"}]}
+```
+
+Every check is reported whether it passed or not, so one call explains a bad
+deployment. Details stay terse — an exception type, a row count — because the
+endpoint is unauthenticated and a driver's error text can contain the connection
+string.
+
+Keeping them separate matters: probing the database from a liveness check would
+turn a brief outage into a restart loop across every replica.
+
 ## Running the API in a container
 
 The whole stack comes up with one command. The API image is built from

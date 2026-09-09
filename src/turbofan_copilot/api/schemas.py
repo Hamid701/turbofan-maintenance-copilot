@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from turbofan_copilot.api.readiness import DependencyCheck
 from turbofan_copilot.core.config import RuntimeEnvironment
 
 
@@ -13,6 +14,18 @@ class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     service: str
     environment: RuntimeEnvironment
+
+
+class ReadinessResponse(BaseModel):
+    """Whether this instance can serve queries, and what it checked to decide.
+
+    Every check is reported whether it passed or failed, so one call explains a
+    bad deployment. Details are deliberately terse - an exception type, a row
+    count - because this endpoint is unauthenticated.
+    """
+
+    status: Literal["ready", "not_ready"]
+    checks: tuple[DependencyCheck, ...]
 
 
 class ErrorResponse(BaseModel):

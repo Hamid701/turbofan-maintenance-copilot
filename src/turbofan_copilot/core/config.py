@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     # unavailable (503), never open.
     ingest_api_key: SecretStr | None = None
 
+    # Without this a connection attempt to an unreachable database blocks until
+    # the operating system gives up, which can be minutes. That turns a readiness
+    # probe into a hang and an orchestrator kills the instance on probe timeout
+    # instead of being told it is simply not ready. libpq treats values below 2
+    # as 2 seconds.
+    database_connect_timeout_seconds: int = Field(default=5, ge=2)
+
     # Where the BGE weights live. The default is the repository's data directory,
     # which is correct for a source checkout; a container installs the package
     # into site-packages, where that relative guess is meaningless, so the image

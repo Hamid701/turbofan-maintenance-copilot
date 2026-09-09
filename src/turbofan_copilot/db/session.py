@@ -33,7 +33,13 @@ def get_engine(settings: Settings | None = None) -> Engine:
         existing = _ENGINES.get(url)
         if existing is not None:
             return existing
-        created = create_engine(url)
+        created = create_engine(
+            url,
+            # Bound how long a connection attempt may block. Without it an
+            # unreachable database hangs the caller - including the readiness
+            # probe - until the operating system times out the socket.
+            connect_args={"connect_timeout": resolved.database_connect_timeout_seconds},
+        )
         _ENGINES[url] = created
         return created
 
