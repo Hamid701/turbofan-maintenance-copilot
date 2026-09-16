@@ -1,7 +1,7 @@
 # Turbofan Maintenance Intelligence Copilot
 
 A retrieval-augmented maintenance assistant for turbine engines. It answers questions from
-the FAA *Aviation Maintenance Technician Handbook — Powerplant* with **page-level citations**,
+the FAA *Aviation Maintenance Technician Handbook: Powerplant* with **page-level citations**,
 pulls a **deterministic engine-health report** from NASA C-MAPSS sensor data when a question
 names an engine, and **refuses to answer** when the manual does not cover the question.
 
@@ -36,7 +36,7 @@ Three behaviours are the point of the project:
   hallucinated.
 - **It abstains.** Out-of-corpus questions and prompt-injection attempts return
   `abstained: true` with no answer text. Scored 10/10 on a labelled evaluation set.
-- **Engine data is deterministic.** "Engine 5 shows rising EGT during start — what should I
+- **Engine data is deterministic.** "Engine 5 shows rising EGT during start. What should I
   inspect?" attaches a least-squares sensor-trend summary and a remaining-useful-life estimate
   computed in plain Python, clearly separated from the manual's guidance.
 
@@ -51,7 +51,7 @@ Retrieval over nine frozen, page-grounded questions (top-5 budget):
 | **RRF hybrid (shipped)** | **0.778** | 0.778 | 0.778 | **0.778** |
 
 The hybrid wins on Hit@1 and MRR and is the shipped configuration. It *loses* Hit@3/5 to the
-lexical baseline — two paraphrased questions fall to ranks 7 and 11. That is recorded rather
+lexical baseline: two paraphrased questions fall to ranks 7 and 11. That is recorded rather
 than hidden; see the decision log in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 
 - **Abstention:** 10/10 on 10 labelled cases (4 answerable, 3 out-of-corpus, 3 injection).
@@ -60,7 +60,7 @@ than hidden; see the decision log in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 - **Cost:** a full evaluation run is roughly US$0.002 on `gpt-4o-mini`.
 
 **Honest limits.** Nine retrieval cases and ten abstention cases are a smoke test, not a
-benchmark — one case is worth 11% of a retrieval metric. The abstention cases are textbook
+benchmark: one case is worth 11% of a retrieval metric. The abstention cases are textbook
 injections, not adversarial ones. The RUL model is a linear degradation-index extrapolation,
 not a competitive C-MAPSS entry.
 
@@ -91,17 +91,17 @@ FAA PDFs ──▶ page-preserving extraction ──▶ 700-char chunks ──�
 | Fusion | Reciprocal rank fusion, `k = 60` | No score normalisation needed across two scales |
 | Orchestration | `langchain-core` LCEL only | Explicit runnables; the meta-package's agents are unused |
 | LLM boundary | `LlmProvider` protocol | Unit-testable without a network; provider-swappable |
-| API | FastAPI application factory | Endpoints stay 1–3 lines; logic lives in the pipeline |
+| API | FastAPI application factory | Endpoints stay 1 to 3 lines; logic lives in the pipeline |
 
 ## API
 
 | Endpoint | Auth | Purpose |
 |---|---|---|
-| `GET /health` | — | Liveness and configured environment |
-| `POST /v1/query` | — | Grounded answer with citations, or a structured abstention |
-| `POST /v1/query/stream` | — | The same answer, preceded by SSE stage markers |
+| `GET /health` | None | Liveness and configured environment |
+| `POST /v1/query` | None | Grounded answer with citations, or a structured abstention |
+| `POST /v1/query/stream` | None | The same answer, preceded by SSE stage markers |
 | `POST /v1/ingest` | `X-API-Key` | Authenticated ingestion request (acknowledgement; see below) |
-| `POST /v1/feedback` | — | Record a reader's up/down verdict on an earlier answer |
+| `POST /v1/feedback` | None | Record a reader's up/down verdict on an earlier answer |
 
 Every response carries an `X-Request-ID`; every error is JSON containing that id. Interactive
 docs with worked examples are at `/docs`.
@@ -111,7 +111,7 @@ one `answer` event with the full payload. It is **not** token streaming: structu
 parsing returns the object at once, and keeping the citation and abstention guarantees was
 judged more valuable than a token-by-token effect.
 
-`POST /v1/ingest` currently authenticates and records the request without running ingestion — a
+`POST /v1/ingest` currently authenticates and records the request without running ingestion, because a
 60-second re-embed does not belong inside an HTTP request. The auth boundary is real and tested;
 the worker behind it is future work.
 
@@ -185,7 +185,7 @@ uv run --no-sync mypy src tests migrations scripts
 uv run --no-sync pytest
 ```
 
-Around 200 tests. Unit tests use fakes throughout — no model load, no database, no network.
+Around 200 tests. Unit tests use fakes throughout: no model load, no database, no network.
 Integration tests skip themselves when PostgreSQL or the API key is absent.
 
 ## Chat in the browser
@@ -206,10 +206,10 @@ because answers quote retrieved documents and those are treated as untrusted.
 
 Two endpoints, answering two different questions.
 
-- `GET /health` — **liveness**. Is the process up? It touches nothing else, so it
+- `GET /health`: **liveness**. Is the process up? It touches nothing else, so it
   keeps answering 200 during a database outage. A failure here means *restart this
   container*. The image's `HEALTHCHECK` uses this one.
-- `GET /ready` — **readiness**. Can this instance serve queries? It checks the
+- `GET /ready`: **readiness**. Can this instance serve queries? It checks the
   database, that the corpus has been ingested, that the embedding weights are on
   disk, and that a generation key is configured, and answers 503 if any of them
   fails. A failure means *stop sending traffic here*, not *restart me*.
@@ -223,7 +223,7 @@ Two endpoints, answering two different questions.
 ```
 
 Every check is reported whether it passed or not, so one call explains a bad
-deployment. Details stay terse — an exception type, a row count — because the
+deployment. Details stay terse (an exception type, a row count) because the
 endpoint is unauthenticated and a driver's error text can contain the connection
 string.
 

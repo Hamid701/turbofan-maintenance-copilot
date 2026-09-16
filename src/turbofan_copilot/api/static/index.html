@@ -181,7 +181,7 @@
   <div class="header-row">
     <div>
       <h1>Turbofan Maintenance Copilot</h1>
-      <p class="subtitle">Decision support only — not certified maintenance guidance.</p>
+      <p class="subtitle">Decision support only, not certified maintenance guidance.</p>
     </div>
     <span class="status" id="status" title="Checking dependencies…">Checking…</span>
   </div>
@@ -284,9 +284,9 @@
     const low = Math.max(0, Math.round(rul.estimated_rul - rul.typical_error_cycles));
     const high = Math.round(rul.estimated_rul + rul.typical_error_cycles);
     card.append(el("div", "rul-range",
-      `Typical error ±${rul.typical_error_cycles} cycles (≈ ${low}–${high}) · capped at 125`));
+      `Typical error ±${rul.typical_error_cycles} cycles (≈ ${low} to ${high}) · capped at 125`));
     card.append(el("span", "prediction-note",
-      `Model prediction, not a measurement — ${rul.model}`));
+      `Model prediction, not a measurement (${rul.model})`));
 
     const movers = trend.trends
       .filter((item) => trend.biggest_movers.includes(item.sensor))
