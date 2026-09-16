@@ -188,6 +188,20 @@ uv run --no-sync pytest
 Around 200 tests. Unit tests use fakes throughout — no model load, no database, no network.
 Integration tests skip themselves when PostgreSQL or the API key is absent.
 
+## Chat in the browser
+
+With the stack running, open **http://localhost:8000/** for a chat page. It streams
+the pipeline's stages as they happen (routing, retrieving, generating), then shows
+the answer with its FAA handbook sources. Engine questions add a card with the
+remaining-useful-life prediction, its typical error, and the sensors moving most. A
+question the evidence cannot answer shows as a refusal rather than a guess.
+
+The page is one self-contained HTML file served by the API itself: no build step, no
+external assets, no extra dependency, and no second server. It reads the
+`POST /v1/query/stream` response by hand, because the browser's `EventSource` only
+supports `GET`. Everything the model returns is inserted as text, never as HTML,
+because answers quote retrieved documents and those are treated as untrusted.
+
 ## Liveness and readiness
 
 Two endpoints, answering two different questions.

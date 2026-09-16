@@ -62,6 +62,12 @@ torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# setuptools bundles only Python files by default. Without this the chat page
+# exists in a source checkout but is silently absent from the installed package,
+# which is exactly how the production image installs it.
+[tool.setuptools.package-data]
+"turbofan_copilot.api" = ["static/*.html"]
+
 [tool.pytest.ini_options]
 addopts = [
     "--strict-config",
