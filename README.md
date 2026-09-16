@@ -36,9 +36,10 @@ Three behaviours are the point of the project:
   hallucinated.
 - **It abstains.** Out-of-corpus questions and prompt-injection attempts return
   `abstained: true` with no answer text. Scored 10/10 on a labelled evaluation set.
-- **Engine data is deterministic.** "Engine 5 shows rising EGT during start. What should I
-  inspect?" attaches a least-squares sensor-trend summary and a remaining-useful-life estimate
-  computed in plain Python, clearly separated from the manual's guidance.
+- **Engine numbers never come from the LLM.** "Engine 5 shows rising EGT during start. What
+  should I inspect?" attaches a least-squares sensor-trend summary and a remaining-useful-life
+  prediction from a fitted gradient-boosted model. The prediction carries its typical error and
+  is labelled as a prediction, clearly separated from the manual's guidance.
 
 ## Measured results
 
@@ -51,18 +52,38 @@ Retrieval over nine frozen, page-grounded questions (top-5 budget):
 | **RRF hybrid (shipped)** | **0.778** | 0.778 | 0.778 | **0.778** |
 
 The hybrid wins on Hit@1 and MRR and is the shipped configuration. It *loses* Hit@3/5 to the
-lexical baseline: two paraphrased questions fall to ranks 7 and 11. That is recorded rather
-than hidden; see the decision log in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
+lexical baseline: two paraphrased questions fall to ranks 7 and 11. That is reported here
+rather than hidden.
 
 - **Abstention:** 10/10 on 10 labelled cases (4 answerable, 3 out-of-corpus, 3 injection).
-- **RUL baseline:** test-set MAE 25.8 / RMSE 32.7 cycles, against a naive mean predictor's
-  35.9 / 40.1.
 - **Cost:** a full evaluation run is roughly US$0.002 on `gpt-4o-mini`.
+
+Remaining useful life on the 100 held-out FD001 test engines, with the model chosen on a
+separate validation split grouped by engine:
+
+| Model | MAE | RMSE | Mean error |
+|---|---|---|---|
+| Naive constant | 34.8 | 42.0 | +12.7 |
+| Degradation-index baseline | 25.8 | 32.7 | +25.8 |
+| Ridge on windowed sensor features | 12.6 | 15.4 | +1.5 |
+| **Gradient-boosted trees (shipped)** | **8.4** | **11.5** | **+1.8** |
+
+These scores cap the true remaining life at 125 cycles, the usual C-MAPSS convention. Against
+the uncapped targets, the way published FD001 results are usually reported, the shipped model
+scores **MAE 9.5 / RMSE 12.8**. The old baseline never once predicted less remaining life than
+an engine really had (its mean error equals its MAE). Overestimating remaining life is the unsafe
+direction for maintenance, because it schedules the inspection too late. The shipped model errs
+both ways (38 engines under, 60 over, 2 exact) with a mean error under 2 cycles. Three checks
+back the result: training on shuffled labels collapses it to the naive score, removing engine
+age as a feature barely changes it, and the evaluation harness reproduces the old baseline's
+published numbers exactly.
 
 **Honest limits.** Nine retrieval cases and ten abstention cases are a smoke test, not a
 benchmark: one case is worth 11% of a retrieval metric. The abstention cases are textbook
-injections, not adversarial ones. The RUL model is a linear degradation-index extrapolation,
-not a competitive C-MAPSS entry.
+injections, not adversarial ones. The RUL model is trained and tested only on FD001, the
+simplest C-MAPSS subset (one operating condition, one fault mode), and the error it reports
+with each prediction is an average over the test set, not a calibrated interval for that
+engine.
 
 ## Architecture
 
@@ -91,13 +112,16 @@ FAA PDFs ──▶ page-preserving extraction ──▶ 700-char chunks ──�
 | Fusion | Reciprocal rank fusion, `k = 60` | No score normalisation needed across two scales |
 | Orchestration | `langchain-core` LCEL only | Explicit runnables; the meta-package's agents are unused |
 | LLM boundary | `LlmProvider` protocol | Unit-testable without a network; provider-swappable |
+| RUL model | scikit-learn `HistGradientBoostingRegressor` on 30-cycle windowed sensor features | Cut the baseline's MAE by two thirds and removed its over-prediction bias |
 | API | FastAPI application factory | Endpoints stay 1 to 3 lines; logic lives in the pipeline |
 
 ## API
 
 | Endpoint | Auth | Purpose |
 |---|---|---|
-| `GET /health` | None | Liveness and configured environment |
+| `GET /` | None | Browser chat page (see below) |
+| `GET /health` | None | Liveness: is the process up |
+| `GET /ready` | None | Readiness: can this instance serve queries (see below) |
 | `POST /v1/query` | None | Grounded answer with citations, or a structured abstention |
 | `POST /v1/query/stream` | None | The same answer, preceded by SSE stage markers |
 | `POST /v1/ingest` | `X-API-Key` | Authenticated ingestion request (acknowledgement; see below) |
@@ -105,6 +129,9 @@ FAA PDFs ──▶ page-preserving extraction ──▶ 700-char chunks ──�
 
 Every response carries an `X-Request-ID`; every error is JSON containing that id. Interactive
 docs with worked examples are at `/docs`.
+
+The query endpoints are open because this runs locally. Each query spends the configured OpenAI
+key, so they need their own API key before any public deployment.
 
 `POST /v1/query/stream` emits `routed` → `retrieved` → `generating` progress markers and then
 one `answer` event with the full payload. It is **not** token streaming: structured-output
@@ -185,7 +212,7 @@ uv run --no-sync mypy src tests migrations scripts
 uv run --no-sync pytest
 ```
 
-Around 200 tests. Unit tests use fakes throughout: no model load, no database, no network.
+Over 240 tests. Unit tests use fakes throughout: no model load, no database, no network.
 Integration tests skip themselves when PostgreSQL or the API key is absent.
 
 ## Chat in the browser
@@ -266,8 +293,10 @@ Notes on the image:
 - **Migrations are not applied at startup.** Several replicas booting together
   must not race to migrate one database, so `alembic upgrade head` is a separate,
   deliberate step.
-- The image is about 2.4 GB, of which 769 MB is PyTorch. That is the price of
-  running the embedding model in-process.
+- **Size:** a 544 MB compressed pull and about 1.8 GB on disk, of which 769 MB is
+  PyTorch. That is the price of running the embedding model in-process. (`docker
+  images` reports a larger figure because it also counts the multi-platform manifest
+  and build attestations.)
 
 ## Stop local services
 
