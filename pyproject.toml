@@ -11,6 +11,8 @@ dependencies = [
     "alembic>=1,<2",
     "fastapi>=0,<1",
     "langchain-core>=0.3,<0.4",
+    "numpy>=2,<3",
+    "onnxruntime>=1.20,<2",
     "openai>=1,<2",
     "pandas>=2.2,<4",
     "pgvector>=0.3,<1",
@@ -19,7 +21,6 @@ dependencies = [
     "pypdf>=6.10,<7",
     "scikit-learn>=1.7,<2",
     "sqlalchemy>=2,<3",
-    "torch>=2.14,<3",
     "transformers>=4.41,<5",
     "uvicorn>=0,<1",
 ]
@@ -46,18 +47,6 @@ dev = [
 # DLLs are too new to carry reputation, so `import scipy.stats` dies on
 # `levyst` and takes scikit-learn with it.
 constraint-dependencies = ["regex<2026", "scipy<1.18"]
-
-# PyPI's Linux torch wheel bundles the whole CUDA toolchain - gigabytes of GPU
-# libraries this service never calls, since inference is CPU-only. The container
-# therefore takes torch from PyTorch's CPU index. Scoped to Linux by marker so
-# the Windows development environment keeps resolving exactly as before.
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[tool.uv.sources]
-torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -107,9 +96,9 @@ strict = true
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-# scikit-learn ships no py.typed marker, so mypy cannot see its types. Scoped to
-# scikit-learn alone; every other module stays strictly checked.
-module = ["sklearn.*"]
+# Neither scikit-learn nor onnxruntime ships a py.typed marker, so mypy cannot see
+# their types. Scoped to those two alone; every other module stays strictly checked.
+module = ["sklearn.*", "onnxruntime.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]

@@ -36,7 +36,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Bake the embedding model in, using the id and revision pinned in the code, so
 # the image is self-contained: no download on first request, and no dependence
-# on Hugging Face being reachable in production.
+# on Hugging Face being reachable in production. This fetches the tokenizer files
+# and the ONNX export of the model; there is no PyTorch anywhere in the image.
 ENV TURBOFAN_MODEL_CACHE_DIR=/opt/models
 RUN /opt/venv/bin/python -c "\
 from pathlib import Path; \
@@ -62,11 +63,15 @@ COPY --from=builder --chown=app:app /opt/models /opt/models
 COPY --chown=app:app migrations ./migrations
 COPY --chown=app:app alembic.ini ./
 
+# TRANSFORMERS_NO_ADVISORY_WARNINGS: transformers announces on import that no deep
+# learning framework is installed. That is intended, because only its tokenizer is
+# used, so the notice is silenced to keep the logs clean.
 ENV PATH="/opt/venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     TURBOFAN_MODEL_CACHE_DIR=/opt/models \
-    HF_HUB_OFFLINE=1
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_NO_ADVISORY_WARNINGS=1
 
 USER app
 EXPOSE 8000

@@ -1,17 +1,32 @@
-"""Local BGE text embeddings with explicit question and passage rules."""
+"""Local BGE text embeddings with explicit question and passage rules.
+
+The model runs on ONNX Runtime rather than PyTorch. A model is an architecture plus
+trained weights; PyTorch was only the program executing it. The BGE authors publish
+an ONNX export of this exact revision, and running it needs a 67 MB runtime instead
+of the roughly 840 MB PyTorch brought with it. The tokenizer, the query prefix, CLS
+pooling, and normalization are unchanged, and the vectors were verified to match the
+PyTorch ones before PyTorch was removed.
+"""
 
 from collections.abc import Iterable
 from pathlib import Path
 
-import torch
-from transformers import BertModel, BertTokenizer
+import numpy as np
+from huggingface_hub import hf_hub_download
+from onnxruntime import InferenceSession
+from transformers import BertTokenizer
 
 MODEL_ID = "BAAI/bge-small-en-v1.5"
 MODEL_REVISION = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
+ONNX_FILENAME = "onnx/model.onnx"
+ONNX_OUTPUT = "last_hidden_state"
 QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 MAX_TOKENS = 512
 EMBEDDING_DIMENSION = 384
 DEFAULT_BATCH_SIZE = 32
+
+# The same floor PyTorch's normalize() uses, so an all-zero vector cannot divide by zero.
+_NORM_EPSILON = 1e-12
 
 type EmbeddingVector = tuple[float, ...]
 
@@ -29,12 +44,14 @@ class BgeEmbedder:
             revision=MODEL_REVISION,
             cache_dir=cache_dir,
         )
-        self._model = BertModel.from_pretrained(
+        model_path = hf_hub_download(
             MODEL_ID,
+            ONNX_FILENAME,
             revision=MODEL_REVISION,
             cache_dir=cache_dir,
         )
-        self._model.eval()
+        self._session = InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        self._input_names = tuple(str(item.name) for item in self._session.get_inputs())
 
     def question_token_count(self, question: str) -> int:
         """Count a question after adding the BGE query prefix."""
@@ -75,13 +92,16 @@ class BgeEmbedder:
         model_inputs = self._tokenizer(
             list(texts),
             padding=True,
-            return_tensors="pt",
+            return_tensors="np",
             truncation=False,
         )
-        with torch.inference_mode():
-            token_vectors = self._model(**model_inputs).last_hidden_state
-            cls_vectors = token_vectors[:, 0]
-            normalized_vectors = torch.nn.functional.normalize(cls_vectors, p=2, dim=1)
+        feeds = {name: np.asarray(model_inputs[name], dtype=np.int64) for name in self._input_names}
+        token_vectors = np.asarray(self._session.run([ONNX_OUTPUT], feeds)[0])
+
+        # CLS pooling: BGE is trained to place the sentence meaning in the first token.
+        cls_vectors = token_vectors[:, 0]
+        norms = np.linalg.norm(cls_vectors, axis=1, keepdims=True)
+        normalized_vectors = cls_vectors / np.maximum(norms, _NORM_EPSILON)
 
         expected_shape = (len(texts), EMBEDDING_DIMENSION)
         if tuple(normalized_vectors.shape) != expected_shape:
@@ -89,11 +109,11 @@ class BgeEmbedder:
                 f"embedding batch has shape {tuple(normalized_vectors.shape)}; "
                 f"expected {expected_shape}"
             )
-        if not bool(torch.isfinite(normalized_vectors).all()):
+        if not bool(np.isfinite(normalized_vectors).all()):
             raise RuntimeError("embedding batch contains a non-finite value")
 
-        lengths = torch.linalg.vector_norm(normalized_vectors, dim=1)
-        if not bool(torch.allclose(lengths, torch.ones_like(lengths), atol=1e-5)):
+        lengths = np.linalg.norm(normalized_vectors, axis=1)
+        if not bool(np.allclose(lengths, 1.0, atol=1e-5)):
             raise RuntimeError("embedding batch contains a vector that is not unit length")
 
         return tuple(
