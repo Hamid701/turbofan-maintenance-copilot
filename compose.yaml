@@ -31,7 +31,6 @@ services:
       # Optional. Without a key the service still starts and serves /health;
       # POST /v1/query fails loudly on first use rather than at boot.
       TURBOFAN_OPENAI_API_KEY: ${TURBOFAN_OPENAI_API_KEY:-}
-      TURBOFAN_INGEST_API_KEY: ${TURBOFAN_INGEST_API_KEY:-}
     ports:
       - "${TURBOFAN_API_PORT:-8000}:8000"
     depends_on:

@@ -34,8 +34,7 @@ def test_query_request_and_response_have_examples() -> None:
     assert response["example"]["citations"][0]["printed_page_label"] == "6-28"
 
 
-def test_ingest_and_feedback_requests_have_examples() -> None:
+def test_feedback_request_has_an_example() -> None:
     spec = _openapi()
 
-    assert _request_schema(spec, "/v1/ingest")["examples"][0] == {"dataset": "corpus"}
     assert _request_schema(spec, "/v1/feedback")["examples"][0]["rating"] == "up"

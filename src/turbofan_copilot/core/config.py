@@ -55,10 +55,6 @@ class Settings(BaseSettings):
     openai_timeout_seconds: float = Field(default=30.0, gt=0)
     openai_max_retries: int = Field(default=2, ge=0)
 
-    # Shared secret for the ingestion endpoints. Absent means those endpoints are
-    # unavailable (503), never open.
-    ingest_api_key: SecretStr | None = None
-
     # Without this a connection attempt to an unreachable database blocks until
     # the operating system gives up, which can be minutes. That turns a readiness
     # probe into a hang and an orchestrator kills the instance on probe timeout

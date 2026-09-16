@@ -12,7 +12,6 @@ from turbofan_copilot.api.errors import (
 from turbofan_copilot.api.middleware import request_id_middleware
 from turbofan_copilot.api.routes.feedback import router as feedback_router
 from turbofan_copilot.api.routes.health import router as health_router
-from turbofan_copilot.api.routes.ingest import router as ingest_router
 from turbofan_copilot.api.routes.query import router as query_router
 from turbofan_copilot.api.routes.ui import router as ui_router
 from turbofan_copilot.core.config import Settings, get_settings
@@ -34,7 +33,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(query_router)
-    app.include_router(ingest_router)
     app.include_router(feedback_router)
     app.include_router(ui_router)
     return app

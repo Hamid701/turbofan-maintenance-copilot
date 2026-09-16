@@ -61,31 +61,6 @@ class QueryRequest(BaseModel):
     ]
 
 
-IngestDataset = Literal["corpus", "fd001"]
-
-
-class IngestRequest(BaseModel):
-    """Which stored dataset an authenticated caller wants (re)ingested."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        json_schema_extra={"examples": [{"dataset": "corpus"}]},
-    )
-
-    dataset: IngestDataset
-
-
-class IngestAccepted(BaseModel):
-    """Acknowledgement that an authenticated ingestion request was accepted."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    status: Literal["accepted"] = "accepted"
-    dataset: IngestDataset
-    request_id: str
-    detail: str
-
-
 FeedbackRating = Literal["up", "down"]
 
 
