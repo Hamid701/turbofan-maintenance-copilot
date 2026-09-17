@@ -8,6 +8,15 @@ names an engine, and **refuses to answer** when the manual does not cover the qu
 This is an educational portfolio project, not certified aviation-maintenance software. Nothing
 here should be used to make a real airworthiness decision.
 
+## Live demo
+
+**https://turbofan-copilot-769759632590.europe-west1.run.app/**
+
+Asking questions needs an API key. Email [ettayyebi.hamid@gmail.com](mailto:ettayyebi.hamid@gmail.com) to request one, then paste it
+into the **API key** field at the top of the page. The first question after a quiet
+period can take about 20 seconds while the service starts; later ones take 2 to 3
+seconds.
+
 ## What it does
 
 Ask a question and get an answer you can check:
