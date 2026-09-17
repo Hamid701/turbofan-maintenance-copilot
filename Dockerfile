@@ -82,5 +82,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"
 
+# --no-access-log: the application writes one structured JSON line per request,
+# with its request ID and latency, so uvicorn's plain-text access line would only
+# duplicate it (and Cloud Run records its own request log as well).
 CMD ["uvicorn", "turbofan_copilot.api.app:create_app", \
-     "--factory", "--host", "0.0.0.0", "--port", "8000"]
+     "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

@@ -15,11 +15,13 @@ from turbofan_copilot.api.routes.health import router as health_router
 from turbofan_copilot.api.routes.query import router as query_router
 from turbofan_copilot.api.routes.ui import router as ui_router
 from turbofan_copilot.core.config import Settings, get_settings
+from turbofan_copilot.core.logging_setup import configure_logging
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build an API instance around one immutable configuration snapshot."""
     resolved_settings = settings or get_settings()
+    configure_logging(resolved_settings.log_level)
     app = FastAPI(
         title=resolved_settings.app_name,
         version="0.1.0",
