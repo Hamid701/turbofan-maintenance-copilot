@@ -1,0 +1,26 @@
+# Questions answered, refused, or failed, split by outcome and endpoint.
+# Created with: gcloud logging metrics create turbofan_query_count --config-from-file=monitoring/query-count.yaml
+name: turbofan_query_count
+description: Questions handled by the copilot, by outcome and endpoint.
+filter: >-
+  resource.type="cloud_run_revision"
+  AND resource.labels.service_name="turbofan-copilot"
+  AND jsonPayload.event="query"
+labelExtractors:
+  outcome: EXTRACT(jsonPayload.outcome)
+  endpoint: EXTRACT(jsonPayload.endpoint)
+  model: EXTRACT(jsonPayload.model)
+metricDescriptor:
+  metricKind: DELTA
+  valueType: INT64
+  unit: "1"
+  labels:
+    - key: outcome
+      valueType: STRING
+      description: answered, abstained, or error
+    - key: endpoint
+      valueType: STRING
+      description: query (blocking) or stream
+    - key: model
+      valueType: STRING
+      description: the generation model that answered

@@ -1,0 +1,27 @@
+# Estimated dollars spent on one question, from the token counts OpenAI returns
+# and the price table in llm/usage.py. It is an estimate, not a bill: the sum over
+# a day is what makes a cost alert possible without waiting for OpenAI's invoice.
+# Buckets start at 0.00001 USD and double 20 times (to about 10 USD per question).
+name: turbofan_query_cost_usd
+description: Estimated cost of one question, in US dollars.
+filter: >-
+  resource.type="cloud_run_revision"
+  AND resource.labels.service_name="turbofan-copilot"
+  AND jsonPayload.event="query"
+  AND jsonPayload.cost_usd>0
+valueExtractor: EXTRACT(jsonPayload.cost_usd)
+labelExtractors:
+  model: EXTRACT(jsonPayload.model)
+bucketOptions:
+  exponentialBuckets:
+    numFiniteBuckets: 20
+    growthFactor: 2
+    scale: 0.00001
+metricDescriptor:
+  metricKind: DELTA
+  valueType: DISTRIBUTION
+  unit: "1"
+  labels:
+    - key: model
+      valueType: STRING
+      description: the generation model that answered

@@ -1,0 +1,29 @@
+# How long a whole question took, from the route's view.
+# Buckets are exponential from 10 ms, doubling 20 times (10 ms to about 3 hours),
+# which covers a fast refusal and a slow first question on one scale.
+name: turbofan_query_latency_ms
+description: End-to-end latency of one question, in milliseconds.
+filter: >-
+  resource.type="cloud_run_revision"
+  AND resource.labels.service_name="turbofan-copilot"
+  AND jsonPayload.event="query"
+valueExtractor: EXTRACT(jsonPayload.latency_ms)
+labelExtractors:
+  outcome: EXTRACT(jsonPayload.outcome)
+  endpoint: EXTRACT(jsonPayload.endpoint)
+bucketOptions:
+  exponentialBuckets:
+    numFiniteBuckets: 20
+    growthFactor: 2
+    scale: 10
+metricDescriptor:
+  metricKind: DELTA
+  valueType: DISTRIBUTION
+  unit: ms
+  labels:
+    - key: outcome
+      valueType: STRING
+      description: answered, abstained, or error
+    - key: endpoint
+      valueType: STRING
+      description: query (blocking) or stream

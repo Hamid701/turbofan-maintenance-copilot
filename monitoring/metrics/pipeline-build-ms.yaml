@@ -1,0 +1,19 @@
+# How long the query pipeline took to build. This happens once per instance, on
+# the first question it serves, and it is most of a cold start: 13.6 s measured on
+# Cloud Run (7.5 s of it fitting the RUL model) against 7.8 s on a laptop.
+name: turbofan_pipeline_build_ms
+description: Time to build the query pipeline on an instance's first question, in milliseconds.
+filter: >-
+  resource.type="cloud_run_revision"
+  AND resource.labels.service_name="turbofan-copilot"
+  AND jsonPayload.event="pipeline_build"
+valueExtractor: EXTRACT(jsonPayload.total_ms)
+bucketOptions:
+  exponentialBuckets:
+    numFiniteBuckets: 16
+    growthFactor: 2
+    scale: 100
+metricDescriptor:
+  metricKind: DELTA
+  valueType: DISTRIBUTION
+  unit: ms
