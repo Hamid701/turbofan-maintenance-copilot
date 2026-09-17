@@ -39,6 +39,10 @@ def get_engine(settings: Settings | None = None) -> Engine:
             # unreachable database hangs the caller - including the readiness
             # probe - until the operating system times out the socket.
             connect_args={"connect_timeout": resolved.database_connect_timeout_seconds},
+            # Test each pooled connection before handing it out. The server can
+            # close an idle one at any time: Neon does so when it scales to zero
+            # after five idle minutes, and without this the next request fails.
+            pool_pre_ping=True,
         )
         _ENGINES[url] = created
         return created
