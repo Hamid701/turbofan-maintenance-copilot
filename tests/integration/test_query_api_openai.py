@@ -42,7 +42,7 @@ def client(db_engine: Engine, committed_row_guard: None) -> TestClient:
     with Session(db_engine) as session:
         if len(load_persisted_corpus(session).chunks) != EXPECTED_CHUNKS:
             pytest.skip("700-char corpus not ingested")
-    app = create_app(settings.model_copy(update={"query_api_key": SecretStr(API_KEY)}))
+    app = create_app(settings.model_copy(update={"client_api_key": SecretStr(API_KEY)}))
     app.dependency_overrides[get_db_session] = _NoDbSession
     return TestClient(app, headers={API_KEY_HEADER: API_KEY})
 

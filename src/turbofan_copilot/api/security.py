@@ -28,7 +28,7 @@ def require_api_key(
     supplied: str | None = Depends(_api_key_header),
 ) -> None:
     """Allow the request only if it carries the configured API key."""
-    configured = cast(Settings, request.app.state.settings).query_api_key
+    configured = cast(Settings, request.app.state.settings).client_api_key
     if configured is None:
         raise HTTPException(status_code=503, detail="The API key is not configured.")
 

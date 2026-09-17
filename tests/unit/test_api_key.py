@@ -54,7 +54,7 @@ def _client(recorder: _Recorder, *, key: str | None = KEY) -> TestClient:
     settings = Settings(
         environment=RuntimeEnvironment.TEST,
         database_url=SecretStr("postgresql+psycopg://user:pw@localhost:5432/turbofan"),
-        query_api_key=SecretStr(key) if key is not None else None,
+        client_api_key=SecretStr(key) if key is not None else None,
     )
     app = create_app(settings)
     app.dependency_overrides[get_query_service] = recorder.dependency

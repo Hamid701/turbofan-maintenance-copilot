@@ -33,7 +33,7 @@ services:
       TURBOFAN_OPENAI_API_KEY: ${TURBOFAN_OPENAI_API_KEY:-}
       # Callers send this as X-API-Key. Without it the /v1 endpoints answer 503
       # and /ready reports not ready.
-      TURBOFAN_QUERY_API_KEY: ${TURBOFAN_QUERY_API_KEY:-}
+      TURBOFAN_CLIENT_API_KEY: ${TURBOFAN_CLIENT_API_KEY:-}
     ports:
       - "${TURBOFAN_API_PORT:-8000}:8000"
     depends_on:

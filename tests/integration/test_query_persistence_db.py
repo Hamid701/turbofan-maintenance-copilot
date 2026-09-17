@@ -21,7 +21,7 @@ API_KEY = "integration-test-key"
 
 
 def _app_with(session: Session) -> TestClient:
-    settings = get_settings().model_copy(update={"query_api_key": SecretStr(API_KEY)})
+    settings = get_settings().model_copy(update={"client_api_key": SecretStr(API_KEY)})
     app = create_app(settings)
     app.dependency_overrides[get_db_session] = lambda: session
     return TestClient(app, headers={API_KEY_HEADER: API_KEY})

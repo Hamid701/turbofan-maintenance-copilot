@@ -119,11 +119,11 @@ def test_blank_secret_variables_count_as_unset(
     # compose passes ${VAR:-}, which sets an empty string instead of omitting it.
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("TURBOFAN_OPENAI_API_KEY", "")
-    monkeypatch.setenv("TURBOFAN_QUERY_API_KEY", "  ")
+    monkeypatch.setenv("TURBOFAN_CLIENT_API_KEY", "  ")
 
     settings = Settings(
         database_url=SecretStr("postgresql+psycopg://u:p@localhost:5432/turbofan"),
     )
 
     assert settings.openai_api_key is None
-    assert settings.query_api_key is None
+    assert settings.client_api_key is None

@@ -34,7 +34,7 @@ def _client(db: FakeSession | None = None) -> TestClient:
     settings = Settings(
         environment=RuntimeEnvironment.TEST,
         database_url=SecretStr("postgresql+psycopg://user:pw@localhost:5432/turbofan"),
-        query_api_key=SecretStr(API_KEY),
+        client_api_key=SecretStr(API_KEY),
     )
     app = create_app(settings)
     app.dependency_overrides[get_db_session] = lambda: db or FakeSession()

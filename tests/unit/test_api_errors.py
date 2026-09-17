@@ -21,7 +21,7 @@ def _settings() -> Settings:
     return Settings(
         environment=RuntimeEnvironment.TEST,
         database_url=SecretStr("postgresql+psycopg://user:pw@localhost:5432/turbofan"),
-        query_api_key=SecretStr(API_KEY),
+        client_api_key=SecretStr(API_KEY),
     )
 
 

@@ -57,7 +57,7 @@ class Settings(BaseSettings):
 
     # The shared secret callers send as X-API-Key to reach the /v1 endpoints. With
     # none configured those endpoints answer 503: closed by default, never open.
-    query_api_key: SecretStr | None = None
+    client_api_key: SecretStr | None = None
 
     # Without this a connection attempt to an unreachable database blocks until
     # the operating system gives up, which can be minutes. That turns a readiness
@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     # sets TURBOFAN_MODEL_CACHE_DIR explicitly.
     model_cache_dir: Path = _REPOSITORY_ROOT / "data" / "processed" / "models"
 
-    @field_validator("openai_api_key", "query_api_key", mode="before")
+    @field_validator("openai_api_key", "client_api_key", mode="before")
     @classmethod
     def blank_secret_is_unset(cls, value: object) -> object:
         """Treat an empty variable as absent.
