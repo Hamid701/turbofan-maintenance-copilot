@@ -57,10 +57,23 @@
     max-width: 860px;
     margin: 0 auto;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
   }
+  .header-controls { display: flex; align-items: center; gap: 10px; }
+  .api-key {
+    width: 170px;
+    padding: 5px 10px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+  .api-key:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   h1 { font-size: 17px; margin: 0; letter-spacing: -0.01em; }
   .subtitle { color: var(--text-muted); font-size: 13px; margin: 2px 0 0; }
   .status {
@@ -183,7 +196,12 @@
       <h1>Turbofan Maintenance Copilot</h1>
       <p class="subtitle">Decision support only, not certified maintenance guidance.</p>
     </div>
-    <span class="status" id="status" title="Checking dependencies…">Checking…</span>
+    <div class="header-controls">
+      <label for="api-key" class="visually-hidden">API key</label>
+      <input class="api-key" id="api-key" type="password" placeholder="API key"
+             autocomplete="off" spellcheck="false">
+      <span class="status" id="status" title="Checking dependencies…">Checking…</span>
+    </div>
   </div>
 </header>
 
@@ -228,6 +246,23 @@
   const input = document.getElementById("question");
   const sendButton = document.getElementById("send");
   const statusPill = document.getElementById("status");
+  const keyInput = document.getElementById("api-key");
+
+  // The key is kept for this tab only: sessionStorage is cleared when the tab
+  // closes, so a key that spends money does not linger in the browser. Storage
+  // can be unavailable (private windows, blocked site data), so every access is
+  // guarded and the page still works, only without remembering the key.
+  const KEY_STORAGE = "turbofan-client-api-key";
+  try {
+    keyInput.value = sessionStorage.getItem(KEY_STORAGE) || "";
+  } catch {}
+  keyInput.addEventListener("input", () => {
+    try {
+      const value = keyInput.value.trim();
+      if (value) sessionStorage.setItem(KEY_STORAGE, value);
+      else sessionStorage.removeItem(KEY_STORAGE);
+    } catch {}
+  });
 
   // Every piece of model or retrieved text is inserted as text, never as HTML.
   // Answers quote retrieved documents, which are untrusted input.
@@ -362,11 +397,23 @@
     try {
       const response = await fetch(STREAM_URL, {
         method: "POST",
-        headers: { "content-type": "application/json", accept: "text/event-stream" },
+        headers: {
+          "content-type": "application/json",
+          accept: "text/event-stream",
+          "X-API-Key": keyInput.value.trim(),
+        },
         body: JSON.stringify({ question }),
       });
       const requestId = response.headers.get("x-request-id");
 
+      if (response.status === 401) {
+        stages.remove();
+        renderError(reply, keyInput.value.trim()
+          ? "The API key was not accepted. Check it and ask again."
+          : "This server needs an API key. Enter it in the key field at the top, then ask again.");
+        keyInput.focus();
+        return;
+      }
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         const detail = Array.isArray(body.detail)
@@ -418,7 +465,8 @@
       await ask(trimmed);
     } finally {
       sendButton.disabled = false;
-      input.focus();
+      // A rejected key moves focus to the key field; do not take it back.
+      if (document.activeElement !== keyInput) input.focus();
     }
   }
 

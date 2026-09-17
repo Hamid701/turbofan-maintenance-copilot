@@ -30,7 +30,10 @@ def require_api_key(
     """Allow the request only if it carries the configured API key."""
     configured = cast(Settings, request.app.state.settings).client_api_key
     if configured is None:
-        raise HTTPException(status_code=503, detail="The API key is not configured.")
+        raise HTTPException(
+            status_code=503,
+            detail="The server has no API key configured, so it cannot accept requests.",
+        )
 
     # Compared as bytes: compare_digest rejects non-ASCII str with a TypeError, and
     # Starlette decodes header bytes as Latin-1, so one odd byte would become a 500.

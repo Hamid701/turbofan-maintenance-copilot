@@ -33,6 +33,19 @@ def test_chat_page_inserts_model_output_as_text_not_html() -> None:
     assert "textContent" in page
 
 
+def test_chat_page_sends_the_api_key_and_keeps_it_for_the_tab_only() -> None:
+    # The /v1 endpoints need X-API-Key. The page keeps the key in sessionStorage,
+    # which is cleared when the tab closes, never in localStorage, which persists.
+    with TestClient(create_app(settings())) as client:
+        page = client.get("/").text
+
+    assert '"X-API-Key"' in page
+    assert 'type="password"' in page
+    assert "sessionStorage" in page
+    assert "localStorage" not in page
+    assert "response.status === 401" in page
+
+
 def test_chat_page_is_not_part_of_the_api_contract() -> None:
     with TestClient(create_app(settings())) as client:
         paths = client.get("/openapi.json").json()["paths"]

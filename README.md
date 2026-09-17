@@ -220,6 +220,11 @@ the answer with its FAA handbook sources. Engine questions add a card with the
 remaining-useful-life prediction, its typical error, and the sensors moving most. A
 question the evidence cannot answer shows as a refusal rather than a guess.
 
+Paste the value of `TURBOFAN_CLIENT_API_KEY` into the **API key** field at the top. The page
+sends it as `X-API-Key` and keeps it in `sessionStorage`, so it is forgotten when the tab
+closes. A missing or wrong key gets a message and puts the cursor back in the key field; a
+server with no key configured says so, and its status pill shows the failing check.
+
 The page is one self-contained HTML file served by the API itself: no build step, no
 external assets, no extra dependency, and no second server. It reads the
 `POST /v1/query/stream` response by hand, because the browser's `EventSource` only
