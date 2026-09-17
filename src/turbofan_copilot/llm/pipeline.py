@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda
 
+from turbofan_copilot.core.telemetry import timed_stage
 from turbofan_copilot.ingestion.chunking import DocumentChunk
 from turbofan_copilot.llm.answer import (
     DEFAULT_EVIDENCE_LIMIT,
@@ -51,13 +52,16 @@ def build_answer_chain(
     """Compose the route -> retrieve -> (refuse | generate -> (refuse | cite)) pipeline."""
 
     def route(state: _State) -> _State:
-        state.reference = detect_engine_reference(state.question)
-        if state.reference is not None and engine_report_lookup is not None:
-            state.report = engine_report_lookup(state.reference)
+        with timed_stage("route"):
+            state.reference = detect_engine_reference(state.question)
+            if state.reference is not None and engine_report_lookup is not None:
+                state.report = engine_report_lookup(state.reference)
         return state
 
     def retrieve(state: _State) -> _State:
-        state.chunks = [chunk for _, chunk in retriever.rank(state.question, limit=evidence_limit)]
+        with timed_stage("retrieve"):
+            ranked = retriever.rank(state.question, limit=evidence_limit)
+            state.chunks = [chunk for _, chunk in ranked]
         return state
 
     def generate(state: _State) -> _State:
@@ -66,13 +70,14 @@ def build_answer_chain(
             sections.append(f"Evidence:\n{format_evidence(state.chunks)}")
         if state.reference is not None and state.report is not None:
             sections.append(format_engine_report(state.reference, state.report))
-        state.reply = provider.complete(
-            [
-                ChatMessage(role="system", content=SYSTEM_PROMPT),
-                ChatMessage(role="user", content="\n\n".join(sections)),
-            ],
-            response_model=ModelReply,
-        )
+        with timed_stage("generate"):
+            state.reply = provider.complete(
+                [
+                    ChatMessage(role="system", content=SYSTEM_PROMPT),
+                    ChatMessage(role="user", content="\n\n".join(sections)),
+                ],
+                response_model=ModelReply,
+            )
         return state
 
     def finalize(state: _State) -> GroundedAnswer:

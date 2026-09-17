@@ -10,6 +10,7 @@ process. Tests replace the whole service through ``app.dependency_overrides``.
 import logging
 import threading
 from collections.abc import AsyncIterator, Iterator
+from time import perf_counter
 from typing import Protocol, cast
 
 from fastapi import FastAPI, Request
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from turbofan_copilot.api.schemas import QueryStreamEvent, QueryStreamEventName
 from turbofan_copilot.core.config import Settings
+from turbofan_copilot.core.telemetry import current_query_telemetry, elapsed_ms
 from turbofan_copilot.db.corpus import load_persisted_corpus
 from turbofan_copilot.db.session import get_engine
 from turbofan_copilot.evaluation.lexical_retrieval import LexicalRetriever
@@ -66,18 +68,36 @@ class PipelineQueryService:
             raise RuntimeError("TURBOFAN_OPENAI_API_KEY must be set to serve POST /v1/query")
         self._provider = build_openai_provider(settings)
         self._session_factory = sessionmaker(get_engine(settings))
+        # The build is the slow part of a cold start, so each piece is timed and
+        # the total is logged once as a structured "pipeline_build" event.
+        timings: dict[str, object] = {"event": "pipeline_build"}
+        build_started = started = perf_counter()
 
         embedder = BgeEmbedder(settings.model_cache_dir)
+        timings["embedder_ms"] = elapsed_ms(started)
         with self._session_factory() as session:
+            started = perf_counter()
             corpus = load_persisted_corpus(session)
+            timings["corpus_ms"] = elapsed_ms(started)
+            started = perf_counter()
             self._degradation_model = load_degradation_model(session)
+            timings["degradation_model_ms"] = elapsed_ms(started)
             # Fitted once at construction, like the retriever: a few seconds over
             # the stored train set, then every request reuses it.
+            started = perf_counter()
             self._rul_regressor = load_rul_regressor(session)
+            timings["rul_model_ms"] = elapsed_ms(started)
 
+        started = perf_counter()
         lexical = LexicalRetriever(corpus.chunks)
         semantic = SemanticRetriever(corpus.chunks, corpus.vectors, embedder)
         retriever = HybridRetriever(lexical, semantic, corpus_size=len(corpus.chunks))
+        timings["retrievers_ms"] = elapsed_ms(started)
+        timings["chunks"] = len(corpus.chunks)
+        timings["total_ms"] = elapsed_ms(build_started)
+        _logger.info(
+            "query pipeline built in %d ms", timings["total_ms"], extra={"fields": timings}
+        )
 
         # One chain, built once, drives both the blocking and the streaming route.
         self._chain = build_answer_chain(
@@ -113,8 +133,13 @@ class PipelineQueryService:
                 output = event["data"].get("output")
                 if isinstance(output, GroundedAnswer):
                     final = output
-        except Exception:
-            _logger.exception("streaming query failed for question %r", question)
+        except Exception as error:
+            # The question is not logged: it is untrusted input that may contain
+            # personal data. The route's query event carries the request ID instead.
+            _logger.exception("streaming query failed")
+            telemetry = current_query_telemetry()
+            if telemetry is not None:
+                telemetry.error_type = type(error).__name__
             yield QueryStreamEvent(
                 event="error", data={"detail": "The query could not be completed."}
             )

@@ -8,6 +8,7 @@ from openai.types.chat import (
 )
 
 from turbofan_copilot.core.config import Settings
+from turbofan_copilot.core.telemetry import current_query_telemetry
 from turbofan_copilot.llm.provider import ChatMessage, ResponseModel
 from turbofan_copilot.llm.usage import TokenUsage
 
@@ -69,6 +70,14 @@ class OpenAiProvider:
                 prompt_tokens=completion.usage.prompt_tokens,
                 completion_tokens=completion.usage.completion_tokens,
             )
+            # The running total above is shared by every request; the question
+            # being served also gets its own count, if one is being collected.
+            telemetry = current_query_telemetry()
+            if telemetry is not None:
+                telemetry.add_llm_call(
+                    prompt_tokens=completion.usage.prompt_tokens,
+                    completion_tokens=completion.usage.completion_tokens,
+                )
         parsed = completion.choices[0].message.parsed
         if parsed is None:
             refusal = completion.choices[0].message.refusal

@@ -18,8 +18,10 @@ from turbofan_copilot.api.dependencies import QueryService, get_db_session, get_
 from turbofan_copilot.api.schemas import QueryRequest, QueryStreamEvent
 from turbofan_copilot.api.security import require_api_key
 from turbofan_copilot.core.config import Settings
+from turbofan_copilot.core.telemetry import QueryTelemetry, collect_query_telemetry, elapsed_ms
 from turbofan_copilot.db.query_log import record_query_run
-from turbofan_copilot.llm.answer import GroundedAnswer
+from turbofan_copilot.llm.answer import NO_EVIDENCE_REASON, NOT_SUPPORTED_REASON, GroundedAnswer
+from turbofan_copilot.llm.usage import TokenUsage, estimate_usd
 
 router = APIRouter(prefix="/v1", tags=["query"], dependencies=[Depends(require_api_key)])
 
@@ -72,6 +74,62 @@ def _persist_run(
         db.rollback()
 
 
+# Short, stable codes for the two refusal points, so a log query can group them.
+_ABSTENTION_CODES = {NO_EVIDENCE_REASON: "no_evidence", NOT_SUPPORTED_REASON: "not_supported"}
+
+
+def _log_query_event(
+    request: Request,
+    *,
+    endpoint: str,
+    telemetry: QueryTelemetry,
+    answer: GroundedAnswer | None,
+    latency_ms: int,
+) -> None:
+    """Write one structured ``query`` event describing how this question went.
+
+    The question text is deliberately left out: it is untrusted input that may
+    contain personal data, and ``query_runs`` already stores it under the same
+    ``request_id`` for anyone entitled to read it.
+    """
+    settings = cast(Settings, request.app.state.settings)
+    if answer is None:
+        outcome = "error"
+    elif answer.abstained:
+        outcome = "abstained"
+    else:
+        outcome = "answered"
+    usage = TokenUsage(
+        calls=telemetry.llm_calls,
+        prompt_tokens=telemetry.prompt_tokens,
+        completion_tokens=telemetry.completion_tokens,
+    )
+    health = answer.engine_health if answer is not None else None
+    fields: dict[str, object] = {
+        "event": "query",
+        "request_id": str(getattr(request.state, "request_id", "unknown")),
+        "endpoint": endpoint,
+        "outcome": outcome,
+        "abstention_reason": (
+            _ABSTENTION_CODES.get(answer.abstention_reason or "", "other")
+            if answer is not None and answer.abstained
+            else None
+        ),
+        "citation_count": len(answer.citations) if answer is not None else 0,
+        "engine_unit_id": health.trend.unit_id if health is not None else None,
+        "rul_model": health.rul.model if health is not None else None,
+        "latency_ms": latency_ms,
+        "stage_ms": telemetry.stage_ms,
+        "llm_calls": usage.calls,
+        "prompt_tokens": usage.prompt_tokens,
+        "completion_tokens": usage.completion_tokens,
+        "model": settings.openai_model,
+        "cost_usd": estimate_usd(settings.openai_model, usage),
+        "error_type": telemetry.error_type,
+    }
+    _logger.info("query %s in %d ms", outcome, latency_ms, extra={"fields": fields})
+
+
 @router.post(
     "/query",
     response_model=GroundedAnswer,
@@ -85,9 +143,25 @@ def post_query(
     db: Session = Depends(get_db_session),
 ) -> GroundedAnswer:
     """Run the retrieval-and-answer pipeline, or return a structured abstention."""
-    started = perf_counter()
-    answer = service.answer(payload.question)
-    _persist_run(db, request, payload.question, answer, round((perf_counter() - started) * 1000))
+    with collect_query_telemetry() as telemetry:
+        started = perf_counter()
+        try:
+            answer = service.answer(payload.question)
+        except Exception as error:
+            telemetry.error_type = type(error).__name__
+            _log_query_event(
+                request,
+                endpoint="query",
+                telemetry=telemetry,
+                answer=None,
+                latency_ms=elapsed_ms(started),
+            )
+            raise
+        latency_ms = elapsed_ms(started)
+        _persist_run(db, request, payload.question, answer, latency_ms)
+        _log_query_event(
+            request, endpoint="query", telemetry=telemetry, answer=answer, latency_ms=latency_ms
+        )
     return answer
 
 
@@ -114,15 +188,24 @@ async def post_query_stream(
     """
 
     async def frames() -> AsyncIterator[str]:
-        started = perf_counter()
-        answer: GroundedAnswer | None = None
-        async for event in service.answer_events(payload.question):
-            if event.event == "answer":
-                answer = GroundedAnswer.model_validate(event.data)
-            yield _to_sse(event)
-        if answer is not None:
-            _persist_run(
-                db, request, payload.question, answer, round((perf_counter() - started) * 1000)
+        # Collected across the whole stream: the body is produced here, after the
+        # route function has already returned the response object.
+        with collect_query_telemetry() as telemetry:
+            started = perf_counter()
+            answer: GroundedAnswer | None = None
+            async for event in service.answer_events(payload.question):
+                if event.event == "answer":
+                    answer = GroundedAnswer.model_validate(event.data)
+                yield _to_sse(event)
+            latency_ms = elapsed_ms(started)
+            if answer is not None:
+                _persist_run(db, request, payload.question, answer, latency_ms)
+            _log_query_event(
+                request,
+                endpoint="stream",
+                telemetry=telemetry,
+                answer=answer,
+                latency_ms=latency_ms,
             )
 
     return StreamingResponse(frames(), media_type="text/event-stream")
