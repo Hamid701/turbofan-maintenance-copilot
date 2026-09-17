@@ -1,0 +1,34 @@
+{
+  "displayName": "Turbofan copilot: a question cost far more than normal",
+  "documentation": {
+    "content": "The 99th percentile of estimated cost per question passed 0.01 USD, about fifty times the measured 0.0002 USD. Likely causes: the prompt grew (more or larger evidence passages), the model was changed to a more expensive one, or a question produced an unusually long answer. Check the prompt_tokens, completion_tokens, and model fields of the query events. A percentile is used because Cloud Monitoring cannot compare a distribution metric to a threshold without an aligner that returns a single number.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "99th percentile cost per question above 0.01 USD",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/turbofan_query_cost_usd\" resource.type=\"cloud_run_revision\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "3600s",
+            "perSeriesAligner": "ALIGN_PERCENTILE_99",
+            "crossSeriesReducer": "REDUCE_MAX",
+            "groupByFields": []
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0.01,
+        "duration": "0s",
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "notificationChannels": ["CHANNEL"],
+  "alertStrategy": {
+    "autoClose": "3600s"
+  }
+}

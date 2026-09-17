@@ -90,7 +90,7 @@
         "xPos": 6,
         "yPos": 4,
         "widget": {
-          "title": "Estimated OpenAI cost per hour (USD)",
+          "title": "Estimated cost per question, 95th percentile (USD)",
           "xyChart": {
             "dataSets": [
               {
@@ -99,13 +99,13 @@
                     "filter": "metric.type=\"logging.googleapis.com/user/turbofan_query_cost_usd\" resource.type=\"cloud_run_revision\"",
                     "aggregation": {
                       "alignmentPeriod": "3600s",
-                      "perSeriesAligner": "ALIGN_SUM",
-                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_PERCENTILE_95",
+                      "crossSeriesReducer": "REDUCE_MAX",
                       "groupByFields": []
                     }
                   }
                 },
-                "plotType": "STACKED_BAR"
+                "plotType": "LINE"
               }
             ]
           }

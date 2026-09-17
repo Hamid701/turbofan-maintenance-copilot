@@ -29,7 +29,12 @@ policy = json.load(open(sys.argv[1], encoding="utf-8"))
 policy["notificationChannels"] = [sys.argv[2]]
 print(json.dumps(policy))
 PY
-  gcloud monitoring policies create --policy-from-file="$tmp" >/dev/null
+  # One rejected file must not stop the rest: Cloud Monitoring validates each
+  # condition on creation, and a bad one should be reported, not block the others.
+  if gcloud monitoring policies create --policy-from-file="$tmp" >/dev/null; then
+    echo "created: $title"
+  else
+    echo "FAILED:  $title (see the error above)"
+  fi
   rm -f "$tmp"
-  echo "created: $title"
 done
