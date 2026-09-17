@@ -12,9 +12,10 @@ from sqlalchemy.orm import Session
 
 from turbofan_copilot.api.dependencies import get_db_session
 from turbofan_copilot.api.schemas import FeedbackAccepted, FeedbackRequest
+from turbofan_copilot.api.security import require_api_key
 from turbofan_copilot.db.query_log import record_feedback
 
-router = APIRouter(prefix="/v1", tags=["feedback"])
+router = APIRouter(prefix="/v1", tags=["feedback"], dependencies=[Depends(require_api_key)])
 
 _logger = logging.getLogger("turbofan_copilot.api.feedback")
 

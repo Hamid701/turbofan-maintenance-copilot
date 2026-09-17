@@ -16,11 +16,12 @@ from sqlalchemy.orm import Session
 
 from turbofan_copilot.api.dependencies import QueryService, get_db_session, get_query_service
 from turbofan_copilot.api.schemas import QueryRequest, QueryStreamEvent
+from turbofan_copilot.api.security import require_api_key
 from turbofan_copilot.core.config import Settings
 from turbofan_copilot.db.query_log import record_query_run
 from turbofan_copilot.llm.answer import GroundedAnswer
 
-router = APIRouter(prefix="/v1", tags=["query"])
+router = APIRouter(prefix="/v1", tags=["query"], dependencies=[Depends(require_api_key)])
 
 _logger = logging.getLogger("turbofan_copilot.api.query")
 

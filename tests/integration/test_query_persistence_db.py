@@ -2,12 +2,14 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from turbofan_copilot.api.app import create_app
 from turbofan_copilot.api.dependencies import get_db_session
 from turbofan_copilot.api.middleware import REQUEST_ID_HEADER
+from turbofan_copilot.api.security import API_KEY_HEADER
 from turbofan_copilot.core.config import get_settings
 from turbofan_copilot.db.corpus import load_persisted_corpus
 from turbofan_copilot.db.models import Feedback, QueryRun
@@ -15,12 +17,14 @@ from turbofan_copilot.db.models import Feedback, QueryRun
 pytestmark = pytest.mark.integration
 
 EXPECTED_CHUNKS = 1050
+API_KEY = "integration-test-key"
 
 
 def _app_with(session: Session) -> TestClient:
-    app = create_app(get_settings())
+    settings = get_settings().model_copy(update={"query_api_key": SecretStr(API_KEY)})
+    app = create_app(settings)
     app.dependency_overrides[get_db_session] = lambda: session
-    return TestClient(app)
+    return TestClient(app, headers={API_KEY_HEADER: API_KEY})
 
 
 def test_feedback_endpoint_writes_a_row(db_session: Session) -> None:

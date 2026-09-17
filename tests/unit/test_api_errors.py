@@ -9,16 +9,19 @@ from pydantic import SecretStr
 from turbofan_copilot.api.app import create_app
 from turbofan_copilot.api.dependencies import get_db_session, get_query_service
 from turbofan_copilot.api.middleware import REQUEST_ID_HEADER
+from turbofan_copilot.api.security import API_KEY_HEADER
 from turbofan_copilot.core.config import RuntimeEnvironment, Settings
 from turbofan_copilot.llm.answer import GroundedAnswer
 
 _HEX32 = re.compile(r"\A[0-9a-f]{32}\Z")
+API_KEY = "test-api-key"
 
 
 def _settings() -> Settings:
     return Settings(
         environment=RuntimeEnvironment.TEST,
         database_url=SecretStr("postgresql+psycopg://user:pw@localhost:5432/turbofan"),
+        query_api_key=SecretStr(API_KEY),
     )
 
 
@@ -66,7 +69,11 @@ def test_a_supplied_request_id_is_echoed_back() -> None:
 
 
 def test_an_unhandled_error_becomes_a_structured_500() -> None:
-    client = TestClient(_query_app(_BoomService()), raise_server_exceptions=False)
+    client = TestClient(
+        _query_app(_BoomService()),
+        raise_server_exceptions=False,
+        headers={API_KEY_HEADER: API_KEY},
+    )
 
     response = client.post("/v1/query", json={"question": "how do compressors work?"})
 
@@ -78,7 +85,7 @@ def test_an_unhandled_error_becomes_a_structured_500() -> None:
 
 
 def test_a_validation_error_keeps_field_detail_and_adds_the_request_id() -> None:
-    with TestClient(_query_app(_BoomService())) as client:
+    with TestClient(_query_app(_BoomService()), headers={API_KEY_HEADER: API_KEY}) as client:
         response = client.post("/v1/query", json={"question": "   "})
 
     assert response.status_code == 422

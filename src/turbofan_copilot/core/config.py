@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     openai_timeout_seconds: float = Field(default=30.0, gt=0)
     openai_max_retries: int = Field(default=2, ge=0)
 
+    # The shared secret callers send as X-API-Key to reach the /v1 endpoints. With
+    # none configured those endpoints answer 503: closed by default, never open.
+    query_api_key: SecretStr | None = None
+
     # Without this a connection attempt to an unreachable database blocks until
     # the operating system gives up, which can be minutes. That turns a readiness
     # probe into a hang and an orchestrator kills the instance on probe timeout
@@ -67,6 +71,16 @@ class Settings(BaseSettings):
     # into site-packages, where that relative guess is meaningless, so the image
     # sets TURBOFAN_MODEL_CACHE_DIR explicitly.
     model_cache_dir: Path = _REPOSITORY_ROOT / "data" / "processed" / "models"
+
+    @field_validator("openai_api_key", "query_api_key", mode="before")
+    @classmethod
+    def blank_secret_is_unset(cls, value: object) -> object:
+        """Treat an empty variable as absent.
+
+        compose passes ``${VAR:-}``, which sets the variable to an empty string
+        rather than leaving it out, and an empty key must not count as configured.
+        """
+        return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("database_url")
     @classmethod

@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from collections.abc import Mapping
 
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -20,11 +21,16 @@ def _request_id(request: Request) -> str:
     return supplied if isinstance(supplied, str) else uuid.uuid4().hex
 
 
-def _json_error(request_id: str, status_code: int, content: object) -> JSONResponse:
+def _json_error(
+    request_id: str,
+    status_code: int,
+    content: object,
+    headers: Mapping[str, str] | None = None,
+) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
         content=content,
-        headers={REQUEST_ID_HEADER: request_id},
+        headers={**(headers or {}), REQUEST_ID_HEADER: request_id},
     )
 
 
@@ -43,7 +49,8 @@ async def handle_http_exception(request: Request, exc: Exception) -> Response:
     request_id = _request_id(request)
     detail = exc.detail if isinstance(exc.detail, str) else "Request failed."
     body = ErrorResponse(detail=detail, request_id=request_id)
-    return _json_error(request_id, exc.status_code, body.model_dump())
+    # Keep the exception's own headers: a 401 must carry WWW-Authenticate.
+    return _json_error(request_id, exc.status_code, body.model_dump(), exc.headers)
 
 
 async def handle_validation_error(request: Request, exc: Exception) -> Response:

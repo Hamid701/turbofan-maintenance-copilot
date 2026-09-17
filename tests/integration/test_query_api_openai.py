@@ -4,17 +4,20 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from turbofan_copilot.api.app import create_app
 from turbofan_copilot.api.dependencies import get_db_session
+from turbofan_copilot.api.security import API_KEY_HEADER
 from turbofan_copilot.core.config import get_settings
 from turbofan_copilot.db.corpus import load_persisted_corpus
 
 pytestmark = pytest.mark.integration
 
 EXPECTED_CHUNKS = 1050
+API_KEY = "integration-test-key"
 
 
 class _NoDbSession:
@@ -39,9 +42,9 @@ def client(db_engine: Engine, committed_row_guard: None) -> TestClient:
     with Session(db_engine) as session:
         if len(load_persisted_corpus(session).chunks) != EXPECTED_CHUNKS:
             pytest.skip("700-char corpus not ingested")
-    app = create_app(settings)
+    app = create_app(settings.model_copy(update={"query_api_key": SecretStr(API_KEY)}))
     app.dependency_overrides[get_db_session] = _NoDbSession
-    return TestClient(app)
+    return TestClient(app, headers={API_KEY_HEADER: API_KEY})
 
 
 def test_query_answers_a_covered_manual_question_with_a_citation(client: TestClient) -> None:

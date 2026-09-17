@@ -110,3 +110,20 @@ def test_openai_key_and_model_load_from_the_environment(
     assert settings.openai_api_key is not None
     assert settings.openai_api_key.get_secret_value() == "sk-test-value"
     assert settings.openai_model == "gpt-4o"
+
+
+def test_blank_secret_variables_count_as_unset(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    # compose passes ${VAR:-}, which sets an empty string instead of omitting it.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("TURBOFAN_OPENAI_API_KEY", "")
+    monkeypatch.setenv("TURBOFAN_QUERY_API_KEY", "  ")
+
+    settings = Settings(
+        database_url=SecretStr("postgresql+psycopg://u:p@localhost:5432/turbofan"),
+    )
+
+    assert settings.openai_api_key is None
+    assert settings.query_api_key is None

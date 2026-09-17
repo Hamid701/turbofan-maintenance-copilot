@@ -6,8 +6,11 @@ from pydantic import SecretStr
 from turbofan_copilot.api.app import create_app
 from turbofan_copilot.api.dependencies import get_db_session
 from turbofan_copilot.api.middleware import REQUEST_ID_HEADER
+from turbofan_copilot.api.security import API_KEY_HEADER
 from turbofan_copilot.core.config import RuntimeEnvironment, Settings
 from turbofan_copilot.db.models import Feedback
+
+API_KEY = "test-api-key"
 
 
 class FakeSession:
@@ -31,10 +34,11 @@ def _client(db: FakeSession | None = None) -> TestClient:
     settings = Settings(
         environment=RuntimeEnvironment.TEST,
         database_url=SecretStr("postgresql+psycopg://user:pw@localhost:5432/turbofan"),
+        query_api_key=SecretStr(API_KEY),
     )
     app = create_app(settings)
     app.dependency_overrides[get_db_session] = lambda: db or FakeSession()
-    return TestClient(app)
+    return TestClient(app, headers={API_KEY_HEADER: API_KEY})
 
 
 def test_feedback_is_accepted_and_recorded() -> None:

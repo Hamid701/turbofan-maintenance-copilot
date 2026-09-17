@@ -16,6 +16,7 @@ from pydantic import SecretStr
 from turbofan_copilot.api.app import create_app
 from turbofan_copilot.api.readiness import (
     DependencyCheck,
+    check_api_key,
     check_database,
     check_embedding_model,
     check_llm_credentials,
@@ -31,6 +32,7 @@ def settings_for(
     database_url: str = UNREACHABLE,
     model_cache_dir: Path | None = None,
     openai_key: str | None = None,
+    query_key: str | None = None,
 ) -> Settings:
     """Build settings without touching the developer's real .env."""
     return Settings(
@@ -39,6 +41,7 @@ def settings_for(
         database_connect_timeout_seconds=2,
         model_cache_dir=model_cache_dir or Path("/nonexistent-model-cache"),
         openai_api_key=SecretStr(openai_key) if openai_key else None,
+        query_api_key=SecretStr(query_key) if query_key else None,
     )
 
 
@@ -84,6 +87,12 @@ def test_llm_credential_check_gates_on_a_configured_key() -> None:
     assert check_llm_credentials(settings_for(openai_key="sk-test")).ok is True
 
 
+def test_api_key_check_gates_on_a_configured_key() -> None:
+    # Without a key every /v1 endpoint answers 503, so the instance is not ready.
+    assert check_api_key(settings_for()).ok is False
+    assert check_api_key(settings_for(query_key="secret")).ok is True
+
+
 def test_every_check_runs_even_after_one_fails() -> None:
     # An operator debugging a bad deployment needs the whole picture at once.
     results = run_readiness_checks(settings_for())
@@ -93,6 +102,7 @@ def test_every_check_runs_even_after_one_fails() -> None:
         "corpus",
         "embedding_model",
         "llm_credentials",
+        "api_key",
     ]
     assert all(check.ok is False for check in results)
 

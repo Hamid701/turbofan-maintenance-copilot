@@ -26,6 +26,7 @@ DATABASE_CHECK = "database"
 CORPUS_CHECK = "corpus"
 EMBEDDING_MODEL_CHECK = "embedding_model"
 LLM_CREDENTIALS_CHECK = "llm_credentials"
+API_KEY_CHECK = "api_key"
 
 
 class DependencyCheck(BaseModel):
@@ -103,11 +104,25 @@ def check_llm_credentials(settings: Settings) -> DependencyCheck:
     return DependencyCheck(name=LLM_CREDENTIALS_CHECK, ok=True, detail="configured")
 
 
+def check_api_key(settings: Settings) -> DependencyCheck:
+    """Confirm the key callers must present is configured.
+
+    Without one every ``/v1`` endpoint answers 503 by design, so the instance can
+    serve nothing a user asks for and should not be given traffic.
+    """
+    if settings.query_api_key is None:
+        return DependencyCheck(
+            name=API_KEY_CHECK, ok=False, detail="TURBOFAN_QUERY_API_KEY is not set"
+        )
+    return DependencyCheck(name=API_KEY_CHECK, ok=True, detail="configured")
+
+
 READINESS_CHECKS: tuple[Callable[[Settings], DependencyCheck], ...] = (
     check_database,
     check_corpus,
     check_embedding_model,
     check_llm_credentials,
+    check_api_key,
 )
 
 

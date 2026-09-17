@@ -9,9 +9,12 @@ from pydantic import SecretStr
 from turbofan_copilot.api.app import create_app
 from turbofan_copilot.api.dependencies import get_db_session, get_query_service
 from turbofan_copilot.api.schemas import QueryStreamEvent
+from turbofan_copilot.api.security import API_KEY_HEADER
 from turbofan_copilot.core.config import RuntimeEnvironment, Settings
 from turbofan_copilot.db.models import QueryRun
 from turbofan_copilot.llm.answer import Citation, GroundedAnswer, abstention
+
+API_KEY = "test-api-key"
 
 
 class FakeSession:
@@ -70,6 +73,7 @@ def _settings() -> Settings:
     return Settings(
         environment=RuntimeEnvironment.TEST,
         database_url=SecretStr("postgresql+psycopg://user:pw@localhost:5432/turbofan"),
+        query_api_key=SecretStr(API_KEY),
     )
 
 
@@ -77,7 +81,7 @@ def _client(service: FakeQueryService, *, db: FakeSession | None = None) -> Test
     app = create_app(_settings())
     app.dependency_overrides[get_query_service] = lambda: service
     app.dependency_overrides[get_db_session] = lambda: db or FakeSession()
-    return TestClient(app)
+    return TestClient(app, headers={API_KEY_HEADER: API_KEY})
 
 
 def _grounded() -> GroundedAnswer:
