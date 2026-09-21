@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     # none configured those endpoints answer 503: closed by default, never open.
     client_api_key: SecretStr | None = None
 
+    # Optional LLM tracing with Langfuse. Tracing is on only when both keys are
+    # set; otherwise it is skipped entirely. The default URL is Langfuse Cloud's
+    # EU region.
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_base_url: str = "https://cloud.langfuse.com"
+
     # Without this a connection attempt to an unreachable database blocks until
     # the operating system gives up, which can be minutes. That turns a readiness
     # probe into a hang and an orchestrator kills the instance on probe timeout
@@ -72,7 +79,13 @@ class Settings(BaseSettings):
     # sets TURBOFAN_MODEL_CACHE_DIR explicitly.
     model_cache_dir: Path = _REPOSITORY_ROOT / "data" / "processed" / "models"
 
-    @field_validator("openai_api_key", "client_api_key", mode="before")
+    @field_validator(
+        "openai_api_key",
+        "client_api_key",
+        "langfuse_public_key",
+        "langfuse_secret_key",
+        mode="before",
+    )
     @classmethod
     def blank_secret_is_unset(cls, value: object) -> object:
         """Treat an empty variable as absent.

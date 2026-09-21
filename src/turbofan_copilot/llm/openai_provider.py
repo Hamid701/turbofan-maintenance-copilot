@@ -9,6 +9,7 @@ from openai.types.chat import (
 
 from turbofan_copilot.core.config import Settings
 from turbofan_copilot.core.telemetry import current_query_telemetry
+from turbofan_copilot.core.tracing import trace_generation
 from turbofan_copilot.llm.provider import ChatMessage, ResponseModel
 from turbofan_copilot.llm.usage import TokenUsage
 
@@ -60,29 +61,42 @@ class OpenAiProvider:
         response_model: type[ResponseModel],
     ) -> ResponseModel:
         """Send ``messages`` and return the parsed structured reply."""
-        completion = self._client.chat.completions.parse(
+        with trace_generation(
+            "openai",
             model=self._model,
-            messages=[_to_param(message) for message in messages],
-            response_format=response_model,
-        )
-        if completion.usage is not None:
-            self._usage = self._usage.plus(
-                prompt_tokens=completion.usage.prompt_tokens,
-                completion_tokens=completion.usage.completion_tokens,
+            input=[message.model_dump() for message in messages],
+        ) as generation:
+            completion = self._client.chat.completions.parse(
+                model=self._model,
+                messages=[_to_param(message) for message in messages],
+                response_format=response_model,
             )
-            # The running total above is shared by every request; the question
-            # being served also gets its own count, if one is being collected.
-            telemetry = current_query_telemetry()
-            if telemetry is not None:
-                telemetry.add_llm_call(
+            if completion.usage is not None:
+                self._usage = self._usage.plus(
                     prompt_tokens=completion.usage.prompt_tokens,
                     completion_tokens=completion.usage.completion_tokens,
                 )
-        parsed = completion.choices[0].message.parsed
-        if parsed is None:
-            refusal = completion.choices[0].message.refusal
-            raise RuntimeError(f"model returned no parseable content (refusal: {refusal})")
-        return parsed
+                # The running total above is shared by every request; the question
+                # being served also gets its own count, if one is being collected.
+                telemetry = current_query_telemetry()
+                if telemetry is not None:
+                    telemetry.add_llm_call(
+                        prompt_tokens=completion.usage.prompt_tokens,
+                        completion_tokens=completion.usage.completion_tokens,
+                    )
+                generation.update(
+                    usage_details={
+                        "input": completion.usage.prompt_tokens,
+                        "output": completion.usage.completion_tokens,
+                    }
+                )
+            parsed = completion.choices[0].message.parsed
+            if parsed is None:
+                refusal = completion.choices[0].message.refusal
+                generation.update(level="ERROR", status_message=f"refusal: {refusal}")
+                raise RuntimeError(f"model returned no parseable content (refusal: {refusal})")
+            generation.update(output=parsed.model_dump())
+            return parsed
 
 
 def build_openai_provider(settings: Settings) -> OpenAiProvider:

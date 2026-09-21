@@ -13,12 +13,14 @@ from typing import cast
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from turbofan_copilot.api.dependencies import QueryService, get_db_session, get_query_service
 from turbofan_copilot.api.schemas import QueryRequest, QueryStreamEvent
 from turbofan_copilot.api.security import require_api_key
 from turbofan_copilot.core.config import Settings
 from turbofan_copilot.core.telemetry import QueryTelemetry, collect_query_telemetry, elapsed_ms
+from turbofan_copilot.core.tracing import flush_tracing, trace_question
 from turbofan_copilot.db.query_log import record_query_run
 from turbofan_copilot.llm.answer import NO_EVIDENCE_REASON, NOT_SUPPORTED_REASON, GroundedAnswer
 from turbofan_copilot.llm.usage import TokenUsage, estimate_usd
@@ -45,6 +47,10 @@ _ANSWER_EXAMPLE = {
 }
 
 
+def _request_id(request: Request) -> str:
+    return str(getattr(request.state, "request_id", "unknown"))
+
+
 def _persist_run(
     db: Session,
     request: Request,
@@ -60,7 +66,7 @@ def _persist_run(
     try:
         record_query_run(
             db,
-            request_id=str(getattr(request.state, "request_id", "unknown")),
+            request_id=_request_id(request),
             question=question,
             abstained=answer.abstained,
             citations=[citation.model_dump() for citation in answer.citations],
@@ -107,7 +113,7 @@ def _log_query_event(
     health = answer.engine_health if answer is not None else None
     fields: dict[str, object] = {
         "event": "query",
-        "request_id": str(getattr(request.state, "request_id", "unknown")),
+        "request_id": _request_id(request),
         "endpoint": endpoint,
         "outcome": outcome,
         "abstention_reason": (
@@ -130,6 +136,16 @@ def _log_query_event(
     _logger.info("query %s in %d ms", outcome, latency_ms, extra={"fields": fields})
 
 
+def _trace_output(answer: GroundedAnswer) -> dict[str, object]:
+    """What the trace records as the question's result."""
+    return {
+        "answer": answer.answer,
+        "abstained": answer.abstained,
+        "abstention_reason": answer.abstention_reason,
+        "citations": [citation.model_dump() for citation in answer.citations],
+    }
+
+
 @router.post(
     "/query",
     response_model=GroundedAnswer,
@@ -143,25 +159,36 @@ def post_query(
     db: Session = Depends(get_db_session),
 ) -> GroundedAnswer:
     """Run the retrieval-and-answer pipeline, or return a structured abstention."""
-    with collect_query_telemetry() as telemetry:
-        started = perf_counter()
-        try:
-            answer = service.answer(payload.question)
-        except Exception as error:
-            telemetry.error_type = type(error).__name__
+    try:
+        with (
+            collect_query_telemetry() as telemetry,
+            trace_question(
+                _request_id(request), endpoint="query", question=payload.question
+            ) as trace,
+        ):
+            started = perf_counter()
+            try:
+                answer = service.answer(payload.question)
+            except Exception as error:
+                telemetry.error_type = type(error).__name__
+                trace.update(level="ERROR", status_message=telemetry.error_type)
+                _log_query_event(
+                    request,
+                    endpoint="query",
+                    telemetry=telemetry,
+                    answer=None,
+                    latency_ms=elapsed_ms(started),
+                )
+                raise
+            latency_ms = elapsed_ms(started)
+            trace.update(output=_trace_output(answer))
+            _persist_run(db, request, payload.question, answer, latency_ms)
             _log_query_event(
-                request,
-                endpoint="query",
-                telemetry=telemetry,
-                answer=None,
-                latency_ms=elapsed_ms(started),
+                request, endpoint="query", telemetry=telemetry, answer=answer, latency_ms=latency_ms
             )
-            raise
-        latency_ms = elapsed_ms(started)
-        _persist_run(db, request, payload.question, answer, latency_ms)
-        _log_query_event(
-            request, endpoint="query", telemetry=telemetry, answer=answer, latency_ms=latency_ms
-        )
+    finally:
+        # After the root span has ended, so the whole trace is sent.
+        flush_tracing()
     return answer
 
 
@@ -190,22 +217,35 @@ async def post_query_stream(
     async def frames() -> AsyncIterator[str]:
         # Collected across the whole stream: the body is produced here, after the
         # route function has already returned the response object.
-        with collect_query_telemetry() as telemetry:
-            started = perf_counter()
-            answer: GroundedAnswer | None = None
-            async for event in service.answer_events(payload.question):
-                if event.event == "answer":
-                    answer = GroundedAnswer.model_validate(event.data)
-                yield _to_sse(event)
-            latency_ms = elapsed_ms(started)
-            if answer is not None:
-                _persist_run(db, request, payload.question, answer, latency_ms)
-            _log_query_event(
-                request,
-                endpoint="stream",
-                telemetry=telemetry,
-                answer=answer,
-                latency_ms=latency_ms,
-            )
+        try:
+            with (
+                collect_query_telemetry() as telemetry,
+                trace_question(
+                    _request_id(request), endpoint="stream", question=payload.question
+                ) as trace,
+            ):
+                started = perf_counter()
+                answer: GroundedAnswer | None = None
+                async for event in service.answer_events(payload.question):
+                    if event.event == "answer":
+                        answer = GroundedAnswer.model_validate(event.data)
+                    yield _to_sse(event)
+                latency_ms = elapsed_ms(started)
+                if answer is not None:
+                    trace.update(output=_trace_output(answer))
+                    _persist_run(db, request, payload.question, answer, latency_ms)
+                else:
+                    trace.update(level="ERROR", status_message=telemetry.error_type or "no answer")
+                _log_query_event(
+                    request,
+                    endpoint="stream",
+                    telemetry=telemetry,
+                    answer=answer,
+                    latency_ms=latency_ms,
+                )
+        finally:
+            # The client already has the answer; sending the spans must not block
+            # the event loop, so it runs in the thread pool.
+            await run_in_threadpool(flush_tracing)
 
     return StreamingResponse(frames(), media_type="text/event-stream")

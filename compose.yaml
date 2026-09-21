@@ -34,6 +34,9 @@ services:
       # Callers send this as X-API-Key. Without it the /v1 endpoints answer 503
       # and /ready reports not ready.
       TURBOFAN_CLIENT_API_KEY: ${TURBOFAN_CLIENT_API_KEY:-}
+      # Optional Langfuse tracing; off unless both keys are set.
+      TURBOFAN_LANGFUSE_PUBLIC_KEY: ${TURBOFAN_LANGFUSE_PUBLIC_KEY:-}
+      TURBOFAN_LANGFUSE_SECRET_KEY: ${TURBOFAN_LANGFUSE_SECRET_KEY:-}
     ports:
       - "${TURBOFAN_API_PORT:-8000}:8000"
     depends_on:

@@ -46,6 +46,14 @@ def test_chat_page_sends_the_api_key_and_keeps_it_for_the_tab_only() -> None:
     assert "response.status === 401" in page
 
 
+def test_chat_page_tells_users_their_questions_are_logged() -> None:
+    # Questions go to the query log and, when tracing is on, to Langfuse.
+    with TestClient(create_app(settings())) as client:
+        page = client.get("/").text
+
+    assert "questions and answers are logged" in page
+
+
 def test_chat_page_is_not_part_of_the_api_contract() -> None:
     with TestClient(create_app(settings())) as client:
         paths = client.get("/openapi.json").json()["paths"]

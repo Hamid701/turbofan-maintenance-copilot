@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from langchain_core.runnables import Runnable, RunnableBranch, RunnableLambda
 
 from turbofan_copilot.core.telemetry import timed_stage
+from turbofan_copilot.core.tracing import trace_stage
 from turbofan_copilot.ingestion.chunking import DocumentChunk
 from turbofan_copilot.llm.answer import (
     DEFAULT_EVIDENCE_LIMIT,
@@ -52,16 +53,37 @@ def build_answer_chain(
     """Compose the route -> retrieve -> (refuse | generate -> (refuse | cite)) pipeline."""
 
     def route(state: _State) -> _State:
-        with timed_stage("route"):
+        with timed_stage("route"), trace_stage("route", kind="tool") as trace:
             state.reference = detect_engine_reference(state.question)
             if state.reference is not None and engine_report_lookup is not None:
                 state.report = engine_report_lookup(state.reference)
+            trace.update(
+                output={
+                    "engine": state.reference.model_dump() if state.reference else None,
+                    "rul": state.report.rul.model_dump(mode="json") if state.report else None,
+                }
+            )
         return state
 
     def retrieve(state: _State) -> _State:
-        with timed_stage("retrieve"):
+        with (
+            timed_stage("retrieve"),
+            trace_stage("retrieve", kind="retriever", input=state.question) as trace,
+        ):
             ranked = retriever.rank(state.question, limit=evidence_limit)
             state.chunks = [chunk for _, chunk in ranked]
+            # The passages the model will see, identified the way citations are.
+            trace.update(
+                output=[
+                    {
+                        "source_id": chunk.source_id,
+                        "page": chunk.printed_page_label,
+                        "score": round(score, 4),
+                        "text": chunk.text,
+                    }
+                    for score, chunk in ranked
+                ]
+            )
         return state
 
     def generate(state: _State) -> _State:
