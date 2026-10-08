@@ -54,6 +54,16 @@ def test_chat_page_tells_users_their_questions_are_logged() -> None:
     assert "questions and answers are logged" in page
 
 
+def test_chat_page_embeds_its_favicon() -> None:
+    # Keeping the icon in the page avoids a separate /favicon.ico request and
+    # its otherwise unavoidable 404 warning in production logs.
+    with TestClient(create_app(settings())) as client:
+        page = client.get("/").text
+
+    assert 'rel="icon"' in page
+    assert "data:image/svg+xml" in page
+
+
 def test_chat_page_is_not_part_of_the_api_contract() -> None:
     with TestClient(create_app(settings())) as client:
         paths = client.get("/openapi.json").json()["paths"]

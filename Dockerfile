@@ -77,8 +77,8 @@ USER app
 EXPOSE 8000
 
 # Liveness only: this asks whether the process is serving, not whether its
-# dependencies are healthy. A readiness check that proves the database is
-# reachable is the next increment.
+# dependencies are healthy. The separate /ready endpoint checks the database,
+# corpus, model files, and required credentials before a revision is promoted.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"
 
