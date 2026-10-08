@@ -139,6 +139,10 @@ the variable is closed rather than open. The key is compared in constant time. I
 secret, not per-user accounts, and there is no rate limiting, so a spending limit on the OpenAI
 account is still the backstop. In `/docs`, use the Authorize button to send it.
 
+The public [threat model](docs/threat-model.md) documents the system's trust boundaries, data flows,
+existing controls, and accepted residual risks, including third-party processing and the limits of a
+shared reviewer key.
+
 `POST /v1/query/stream` emits `routed` → `retrieved` → `generating` progress markers and then
 one `answer` event with the full payload. It is **not** token streaming: structured-output
 parsing returns the object at once, and keeping the citation and abstention guarantees was
